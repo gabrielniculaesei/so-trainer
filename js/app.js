@@ -40,10 +40,11 @@
   });
 
   // navigazione tra le sezioni
-  const views = ["home", "quiz", "esercizi", "esame", "orale", "aperte", "stats"];
+  const views = ["home", "quiz", "esercizi", "sim", "esame", "orale", "aperte", "stats"];
   function show(name) {
     views.forEach(v => { $("#view-" + v).classList.toggle("active", v === name); });
     $$("nav button").forEach(b => b.classList.toggle("active", b.dataset.view === name));
+    if (name !== "sim" && window.SIMKIT) window.SIMKIT.stopAll(); // niente autoplay in background
     window.scrollTo(0, 0);
     if (name === "home") focusTerm();
   }
@@ -232,6 +233,47 @@
   }
   renderEsercizi();
 
+  // Simulazioni interattive degli algoritmi (definite in js/sims*.js):
+  // menu a griglia → pagina dedicata con player, confronti e guida
+  buildChips("#simChips", renderSimMenu);
+  function renderSimMenu() {
+    const topics = selectedTopics("#simChips");
+    const box = $("#simList"); box.innerHTML = "";
+    window.SIMS.filter(s => !topics || topics.has(s.topic)).forEach(s => {
+      const t = document.createElement("button");
+      t.className = "simtile";
+      t.innerHTML = `<span class="simtile-icon">${s.icon || "🕹"}</span>
+        <span class="simtile-body">
+          <span class="simtile-title">${s.name || s.title}</span>
+          <span class="simtile-desc">${s.desc}</span>
+          <span class="badge acc">${window.TOPICS[s.topic]}</span>
+        </span>`;
+      t.addEventListener("click", () => openSim(s));
+      box.appendChild(t);
+    });
+  }
+  function closeSimDetail() {
+    if (window.SIMKIT) window.SIMKIT.stopAll();
+    $("#simMount").innerHTML = "";
+    $("#simDetail").classList.add("hidden");
+    $("#simMenu").classList.remove("hidden");
+  }
+  function openSim(s) {
+    if (window.SIMKIT) window.SIMKIT.stopAll();
+    $("#simMenu").classList.add("hidden");
+    $("#simDetail").classList.remove("hidden");
+    $("#simTopic").textContent = window.TOPICS[s.topic];
+    $("#simTitle").textContent = s.name || s.title;
+    $("#simLead").innerHTML = s.desc;
+    const m = $("#simMount"); m.innerHTML = "";
+    s.mount(m);
+    $("#simInfo").innerHTML = s.info ? `<h3 class="siminfo-h">guida — cosa stai guardando</h3>${s.info}` : "";
+    $("#simInfo").classList.toggle("hidden", !s.info);
+    window.scrollTo(0, 0);
+  }
+  $("#simBackBtn").addEventListener("click", closeSimDetail);
+  renderSimMenu();
+
   // Simulazione d'esame con timer
   let exam = null; // {mcqs:[{q, order, chosen}], exs:[{gen, inst, self}], timer, deadline}
   $("#examStartBtn").addEventListener("click", startExam);
@@ -418,7 +460,7 @@
 
   // Terminale interattivo nella home
   const termOut = $("#termOut"), termIn = $("#termIn"), termScr = $("#termScr");
-  const NAV = { home: "home", quiz: "quiz", esercizi: "esercizi", esercizio: "esercizi", esame: "esame", orale: "orale", aperte: "aperte", aperta: "aperte", stats: "stats", statistiche: "stats" };
+  const NAV = { home: "home", quiz: "quiz", esercizi: "esercizi", esercizio: "esercizi", sim: "sim", simulazioni: "sim", algoritmi: "sim", esame: "esame", orale: "orale", aperte: "aperte", aperta: "aperte", stats: "stats", statistiche: "stats" };
   const PS1 = `<span class="term-ps1">user@so-trainer<span class="term-tld">:~$</span></span>`;
   const termHist = []; let termHistI = 0;
 
@@ -434,7 +476,7 @@
     if (!termOut) return;
     termOut.innerHTML = "";
     termPrint("SO-Trainer — preparazione teoria di Sistemi Operativi", "term-hi");
-    termPrint(`${window.MCQ.length} crocette · ${window.ORALI.length} orale · ${window.APERTE.length} aperte · ${window.ESERCIZI.length} esercizi · ${window.GENERATORS.length} generatori`);
+    termPrint(`${window.MCQ.length} crocette · ${window.ORALI.length} orale · ${window.APERTE.length} aperte · ${window.ESERCIZI.length} esercizi · ${window.GENERATORS.length} generatori · ${window.SIMS.length} simulazioni`);
     termPrint("Scrivi <b>help</b> per i comandi, oppure clicca una voce qui sotto.", "term-dim2");
   }
   function termFetch() {
@@ -446,7 +488,8 @@
       "Crocette : " + window.MCQ.length,
       "Orale    : " + window.ORALI.length,
       "Aperte   : " + window.APERTE.length,
-      "Esercizi : " + window.ESERCIZI.length + " risolti + " + window.GENERATORS.length + " generatori"
+      "Esercizi : " + window.ESERCIZI.length + " risolti + " + window.GENERATORS.length + " generatori",
+      "Sim      : " + window.SIMS.length + " interattive"
     ];
     termPrint("<pre class='term-fetch'>" + L.map(esc).join("\n") + "</pre>");
   }
@@ -461,11 +504,11 @@
     const arg = parts.slice(1).join(" ");
 
     if (word === "help" || word === "?" || word === "aiuto") {
-      termPrint("<b>quiz</b> · <b>esercizi</b> · <b>esame</b> · <b>orale</b> · <b>aperte</b> · <b>stats</b> — apre la sezione");
+      termPrint("<b>quiz</b> · <b>esercizi</b> · <b>sim</b> · <b>esame</b> · <b>orale</b> · <b>aperte</b> · <b>stats</b> — apre la sezione");
       termPrint("<b>ls</b> elenca · <b>clear</b> pulisce · <b>whoami</b> · <b>date</b> · <b>neofetch</b>");
       termPrint("puoi anche scrivere <b>./esercizi</b>", "term-dim2");
     } else if (word === "ls" || word === "ll" || word === "dir") {
-      termPrint("quiz/   esercizi/   esame/   orale/   aperte/   stats/");
+      termPrint("quiz/   esercizi/   sim/   esame/   orale/   aperte/   stats/");
     } else if (word === "clear" || word === "cls") {
       termOut.innerHTML = ""; return;
     } else if (word === "whoami") {
@@ -587,7 +630,7 @@
   }
   $$("nav button").forEach(b => b.addEventListener("click", () => { if (b.dataset.view === "stats") renderStats(); }));
   $("#statsResetBtn").addEventListener("click", () => {
-    if (confirm("Azzerare tutte le statistiche?")) { store.mcq = {}; store.oral = {}; save(); renderStats(); }
+    if (confirm("Azzerare tutte le statistiche?")) { store.mcq = {}; store.oral = {}; store.aperte = {}; save(); renderStats(); }
   });
   $("#statsWrongBtn").addEventListener("click", () => {
     show("quiz");

@@ -40,6 +40,7 @@
       <button data-view="home" class="active">home</button>
       <button data-view="quiz">quiz</button>
       <button data-view="esercizi">esercizi</button>
+      <button data-view="sim">sim</button>
       <button data-view="esame">esame</button>
       <button data-view="orale">orale</button>
       <button data-view="aperte">aperte</button>
@@ -77,6 +78,10 @@
       <button class="app" data-view="esercizi">
         <span class="app-cmd">esercizi</span>
         <span class="app-desc">esercizi risolti e generatori con parametri casuali</span>
+      </button>
+      <button class="app" data-view="sim">
+        <span class="app-cmd">sim</span>
+        <span class="app-desc">simulazioni interattive: guarda gli algoritmi lavorare passo passo</span>
       </button>
       <button class="app" data-view="esame">
         <span class="app-cmd">esame</span>
@@ -147,6 +152,26 @@
     <div id="genList"></div>
     <h2>esercizi risolti</h2>
     <div id="exList"></div>
+  </section>
+
+  <!-- ==================== SIMULAZIONI INTERATTIVE ==================== -->
+  <section id="view-sim" class="view">
+    <div id="simMenu">
+      <h1>simulazioni interattive</h1>
+      <p class="lead">Gli algoritmi del corso, animati passo passo. Scegli una simulazione: si apre a tutta pagina, con i controlli per avanzare una mossa alla volta, i confronti tra algoritmi e una guida su cosa stai guardando.</p>
+      <div class="chips" id="simChips"></div>
+      <div id="simList" class="simgrid"></div>
+    </div>
+    <div id="simDetail" class="hidden">
+      <div class="sim-topnav">
+        <button class="btn secondary small" id="simBackBtn">← tutte le simulazioni</button>
+        <span class="badge acc" id="simTopic"></span>
+      </div>
+      <h1 id="simTitle"></h1>
+      <p class="lead" id="simLead"></p>
+      <div class="card" id="simMount"></div>
+      <div class="card" id="simInfo"></div>
+    </div>
   </section>
 
   <!-- ==================== ESAME ==================== -->
@@ -302,6 +327,8 @@
 <script src="data/data_extra.js"></script>
 <script src="data/generators.js"></script>
 <script src="data/generators2.js"></script>
+<script src="js/sims.js"></script>
+<script src="js/sims2.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
