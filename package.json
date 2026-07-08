@@ -1,0 +1,7 @@
+{
+  "name": "so-trainer",
+  "version": "1.0.0",
+  "description": "Web app di preparazione all'esame di Sistemi Operativi (teoria)",
+  "type": "commonjs",
+  "private": true
+}

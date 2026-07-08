@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SO Trainer — Sistemi Operativi</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2216%22 fill=%22%2314201a%22/><text x=%2216%22 y=%2268%22 font-family=%22monospace%22 font-size=%2252%22 fill=%22%234ade80%22>&gt;_</text></svg>">
+</head>
+<body>
+
+<header>
+  <div class="topbar">
+    <div class="winbtns"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+    <div class="brand">~/sistemi-operativi/<b>so-trainer</b></div>
+    <nav>
+      <button data-view="home" class="active">home</button>
+      <button data-view="quiz">quiz</button>
+      <button data-view="esercizi">esercizi</button>
+      <button data-view="esame">esame</button>
+      <button data-view="orale">orale</button>
+      <button data-view="aperte">aperte</button>
+      <button data-view="stats">stats</button>
+    </nav>
+    <div class="spacer"></div>
+    <button id="themeToggle" title="Cambia tema">◐</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- ==================== HOME ==================== -->
+  <section id="view-home" class="view active">
+    <div class="term" id="homeTerm">
+      <div class="term-bar">
+        <span class="winbtns"><span class="r"></span><span class="y"></span><span class="g"></span></span>
+        <span class="term-name">user@so-trainer: ~</span>
+        <span class="term-tag">bash</span>
+      </div>
+      <div class="term-scr" id="termScr">
+        <div id="termOut"></div>
+        <div class="term-line">
+          <span class="term-ps1">user@so-trainer<span class="term-tld">:~$</span></span>
+          <input id="termIn" class="term-in" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" aria-label="riga di comando">
+        </div>
+      </div>
+    </div>
+
+    <div class="applist">
+      <button class="app" data-view="quiz">
+        <span class="app-cmd">quiz</span>
+        <span class="app-desc">crocette in stile esame, con correzione e spiegazione</span>
+      </button>
+      <button class="app" data-view="esercizi">
+        <span class="app-cmd">esercizi</span>
+        <span class="app-desc">esercizi risolti e generatori con parametri casuali</span>
+      </button>
+      <button class="app" data-view="esame">
+        <span class="app-cmd">esame</span>
+        <span class="app-desc">simulazione col timer: crocette + esercizi, voto finale</span>
+      </button>
+      <button class="app" data-view="orale">
+        <span class="app-cmd">orale</span>
+        <span class="app-desc">flashcard: leggi, rispondi a voce, confronta</span>
+      </button>
+      <button class="app" data-view="aperte">
+        <span class="app-cmd">aperte</span>
+        <span class="app-desc">domande aperte di teoria: imposta la risposta, poi confronta</span>
+      </button>
+      <button class="app" data-view="stats">
+        <span class="app-cmd">stats</span>
+        <span class="app-desc">andamento per argomento e ripasso degli errori</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ==================== QUIZ ==================== -->
+  <section id="view-quiz" class="view">
+    <h1>quiz a risposta multipla</h1>
+
+    <div id="quizSetup">
+      <div class="chips" id="quizChips"></div>
+      <div class="card">
+        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+          <input type="checkbox" id="quizOnlyWrong"> solo le domande che ho sbagliato in passato
+        </label>
+        <div class="quiz-controls">
+          <button class="btn" id="quizStartBtn">inizia il quiz</button>
+          <span id="quizCount" class="badge"></span>
+        </div>
+      </div>
+    </div>
+
+    <div id="quizPlay" class="hidden">
+      <div class="progressbar" id="quizProgress"><div></div></div>
+      <div class="card">
+        <div class="qmeta" id="quizMeta"></div>
+        <div class="qtext" id="quizQText"></div>
+        <div class="options" id="quizOptions"></div>
+        <div class="expl hidden" id="quizExpl"></div>
+        <div class="quiz-controls">
+          <button class="btn hidden" id="quizNextBtn">prossima →</button>
+          <button class="btn secondary small" id="quizAbortBtn">interrompi</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="quizEnd" class="hidden">
+      <div class="card" style="text-align:center">
+        <div id="quizEndText"></div>
+        <div class="quiz-controls" style="justify-content:center">
+          <button class="btn" id="quizRestartBtn">nuovo quiz</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== ESERCIZI ==================== -->
+  <section id="view-esercizi" class="view">
+    <h1>esercizi</h1>
+    <p class="lead">Provali su carta, poi confronta con la soluzione. I generatori creano varianti sempre nuove: i numeri cambiano, il metodo resta.</p>
+    <div class="chips" id="exChips"></div>
+    <h2>generatori (parametri casuali)</h2>
+    <div id="genList"></div>
+    <h2>esercizi risolti</h2>
+    <div id="exList"></div>
+  </section>
+
+  <!-- ==================== ESAME ==================== -->
+  <section id="view-esame" class="view">
+    <h1>simulazione esame</h1>
+
+    <div id="examSetup">
+      <p class="lead">Genera un compito realistico e rispondi a tutto, poi consegna: le crocette vengono corrette automaticamente, gli esercizi li valuti tu confrontandoti con la soluzione.</p>
+      <div class="card exam-config">
+        <label>domande a risposta multipla</label>
+        <select id="examNumMcq">
+          <option value="6">6</option>
+          <option value="8" selected>8</option>
+          <option value="10">10</option>
+          <option value="12">12</option>
+        </select>
+        <label>esercizi</label>
+        <select id="examNumEx">
+          <option value="2">2</option>
+          <option value="3" selected>3</option>
+          <option value="4">4</option>
+        </select>
+        <label>durata (minuti)</label>
+        <select id="examTimer0">
+          <option value="30">30</option>
+          <option value="45">45</option>
+          <option value="60" selected>60</option>
+          <option value="90">90</option>
+          <option value="0">senza timer</option>
+        </select>
+        <div class="quiz-controls">
+          <button class="btn" id="examStartBtn">genera il compito</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="examPlay" class="hidden">
+      <div id="examQuestions"></div>
+      <div id="examResult" class="card hidden" style="text-align:center">
+        <div id="examResultText"></div>
+        <div class="quiz-controls" style="justify-content:center">
+          <button class="btn" id="examNewBtn">nuova simulazione</button>
+        </div>
+      </div>
+      <div class="exam-nav">
+        <span id="examTimer" class="hidden"></span>
+        <div class="spacer"></div>
+        <button class="btn ok" id="examSubmitBtn">consegna il compito</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== ORALE ==================== -->
+  <section id="view-orale" class="view">
+    <h1>preparazione orale</h1>
+
+    <div id="oralSetup">
+      <p class="lead">Leggi la domanda, rispondi <b>ad alta voce</b> come all'orale, poi mostra la risposta modello e valutati con onestà. Le domande mai viste o sbagliate hanno priorità.</p>
+      <div class="chips" id="oralChips"></div>
+      <div class="card">
+        <div class="quiz-controls">
+          <button class="btn" id="oralStartBtn">inizia il ripasso</button>
+          <span id="oralCount" class="badge"></span>
+        </div>
+      </div>
+    </div>
+
+    <div id="oralPlay" class="hidden">
+      <div class="card flashcard">
+        <div class="qmeta" id="oralMeta"></div>
+        <div class="fc-q" id="oralQ"></div>
+        <div class="fc-a hidden" id="oralA"></div>
+        <div class="quiz-controls">
+          <button class="btn" id="oralShowBtn">mostra la risposta</button>
+          <div id="oralGrade" class="hidden" style="display:flex;gap:.6rem;flex-wrap:wrap">
+            <button class="btn ok" id="oralOkBtn">la sapevo</button>
+            <button class="btn danger" id="oralNoBtn">da ripassare</button>
+          </div>
+          <button class="btn secondary small" id="oralStopBtn">interrompi</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== APERTE ==================== -->
+  <section id="view-aperte" class="view">
+    <h1>domande aperte</h1>
+
+    <div id="apSetup">
+      <p class="lead">Domande di teoria da esporre per esteso. Imposta la risposta, poi confrontala con quella modello (i punti che una buona risposta deve toccare).</p>
+      <div class="chips" id="apChips"></div>
+      <div class="card">
+        <div class="quiz-controls">
+          <button class="btn" id="apStartBtn">inizia</button>
+          <span id="apCount" class="badge"></span>
+        </div>
+      </div>
+    </div>
+
+    <div id="apPlay" class="hidden">
+      <div class="card flashcard">
+        <div class="qmeta" id="apMeta"></div>
+        <div class="fc-q" id="apQ"></div>
+        <textarea class="answerbox" id="apAnswer" placeholder="Imposta qui la tua risposta (facoltativo)…"></textarea>
+        <div class="fc-a hidden" id="apA"></div>
+        <div class="quiz-controls">
+          <button class="btn" id="apShowBtn">mostra la risposta modello</button>
+          <div id="apGrade" class="hidden" style="display:flex;gap:.6rem;flex-wrap:wrap">
+            <button class="btn ok" id="apOkBtn">la sapevo</button>
+            <button class="btn danger" id="apNoBtn">da ripassare</button>
+          </div>
+          <button class="btn secondary small" id="apStopBtn">interrompi</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== STATISTICHE ==================== -->
+  <section id="view-stats" class="view">
+    <h1>statistiche</h1>
+    <div class="card">
+      <p id="statsTotal"></p>
+      <p id="statsOral"></p>
+      <p id="statsOpen"></p>
+      <div id="statsBox" style="margin-top:1rem"></div>
+      <div class="quiz-controls">
+        <button class="btn" id="statsWrongBtn">ripassa le domande sbagliate</button>
+        <button class="btn danger small" id="statsResetBtn">azzera statistiche</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="sitefoot">
+  <a href="https://github.com/gabrielniculaesei/so-trainer" target="_blank" rel="noopener" class="gh-link">
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+    <span>codice su GitHub</span>
+  </a>
+  <span class="foot-sep">·</span>
+  <a href="https://github.com/gabrielniculaesei/so-trainer/issues" target="_blank" rel="noopener">problemi o idee? apri una issue</a>
+</footer>
+
+<script src="data_mcq_1.js"></script>
+<script src="data_mcq_2.js"></script>
+<script src="data_mcq_3.js"></script>
+<script src="data_mcq_4.js"></script>
+<script src="data_mcq_5.js"></script>
+<script src="data_mcq_6.js"></script>
+<script src="data_other.js"></script>
+<script src="data_other2.js"></script>
+<script src="data_extra.js"></script>
+<script src="generators.js"></script>
+<script src="generators2.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
