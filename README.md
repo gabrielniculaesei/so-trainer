@@ -1,40 +1,35 @@
-# SO Trainer — Preparazione esame Sistemi Operativi (teoria)
+# SO Trainer — Preparazione esame Sistemi Operativi
 
-Web app statica per prepararsi allo scritto e all'orale. Nessuna dipendenza, nessun build: **basta aprire `index.html` nel browser** (doppio click).
+Web app statica per prepararsi allo scritto e all’orale di Sistemi Operativi, con quiz, esercizi, simulazioni d’esame, flashcard e domande aperte.
 
-🔗 **Online**: <!-- TODO: link Vercel dopo il deploy -->
+**Sito online**: [so-trainer.vercel.app](https://so-trainer.vercel.app)
 
-In alternativa, per servirla via HTTP:
-
-```bash
-cd webapp
-python3 -m http.server 8080
-# poi apri http://localhost:8080
-```
+[![SO Trainer preview](img/logo.png)](https://so-trainer.vercel.app)
 
 ## Contenuto
 
 | File | Contenuto |
 |---|---|
-| `data/data_mcq_1..7.js` | Banca di 278 domande a risposta multipla in stile esame (opzioni A–E), divise per argomento |
+| `img/logo.png` | Immagine di copertina del progetto, usata anche come preview del sito |
+| `data/data_mcq_1..7.js` | Banca di 278 domande a risposta multipla in stile esame, con opzioni A–E, divise per argomento |
 | `data/data_other.js`, `data/data_other2.js` | 45 domande da orale con risposte modello + 33 esercizi risolti passo-passo |
-| `data/data_extra.js` | 20 domande da orale aggiuntive + 17 domande aperte di teoria (risposta discorsiva con risposta modello) |
-| `data/generators.js`, `data/generators2.js` | 25 generatori di esercizi con parametri casuali e soluzione calcolata (FAT, i-node, EAT/TLB, scheduling disco e CPU, sostituzione pagine, RAID/XOR, pipeline, semafori, aging…) |
-| `app.js` | Logica: terminale interattivo, quiz, simulazione esame con timer, flashcard orale, domande aperte, statistiche (localStorage) |
+| `data/data_extra.js` | 20 domande da orale aggiuntive + 17 domande aperte di teoria, con risposta modello |
+| `data/generators.js`, `data/generators2.js` | 25 generatori di esercizi con parametri casuali e soluzione calcolata: FAT, i-node, EAT/TLB, scheduling disco e CPU, sostituzione pagine, RAID/XOR, pipeline, semafori, aging… |
+| `app.js` | Logica dell’app: terminale interattivo, quiz, simulazione esame con timer, flashcard orale, domande aperte e statistiche salvate nel browser tramite localStorage |
 
 ## Modalità
 
-- **Home**: un terminale interattivo — digita `quiz`, `./esercizi`, `orale`, `aperte`… (oppure `help`, `ls`, `neofetch`) per spostarti tra le sezioni. In alternativa clicca una voce dell'elenco.
-- **Quiz**: feedback immediato con spiegazione, filtro per argomento, modalità "solo domande sbagliate". Tasti `1–5` per rispondere, `Invio` per proseguire.
-- **Esercizi**: prova su carta, poi "Mostra soluzione". I generatori creano varianti sempre nuove.
-- **Simulazione esame**: N crocette + M esercizi con timer; correzione automatica delle crocette, autovalutazione degli esercizi, voto indicativo secondo le fasce del syllabus.
-- **Orale**: flashcard con risposte modello; le domande mai viste o sbagliate hanno priorità.
-- **Domande aperte**: teoria da esporre per esteso; imposti la risposta e la confronti con quella modello (i punti chiave da toccare).
-- **Statistiche**: prestazioni per argomento (salvate nel browser).
+* **Home**: terminale interattivo — digita `quiz`, `./esercizi`, `orale`, `aperte`… oppure `help`, `ls`, `neofetch` per spostarti tra le sezioni. In alternativa puoi cliccare una voce dell’elenco.
+* **Quiz**: feedback immediato con spiegazione, filtro per argomento e modalità “solo domande sbagliate”. Puoi usare i tasti `1–5` per rispondere e `Invio` per proseguire.
+* **Esercizi**: prova prima su carta, poi usa “Mostra soluzione” per controllare il procedimento. I generatori creano varianti sempre nuove.
+* **Simulazione esame**: N crocette + M esercizi con timer; correzione automatica delle crocette, autovalutazione degli esercizi e voto indicativo secondo le fasce del syllabus.
+* **Orale**: flashcard con risposte modello; le domande mai viste o sbagliate hanno priorità.
+* **Domande aperte**: teoria da esporre per esteso; scrivi la tua risposta e confrontala con quella modello, controllando i punti chiave da toccare.
+* **Statistiche**: prestazioni per argomento, salvate nel browser.
 
 ## Aggiungere domande
 
-Aggiungi un oggetto all'array in uno dei `data/data_mcq_*.js`:
+Aggiungi un oggetto all’array in uno dei `data/data_mcq_*.js`:
 
 ```js
 { id: "xx99", topic: "memoria",      // vedi window.TOPICS in data/data_mcq_1.js
@@ -44,8 +39,14 @@ Aggiungi un oggetto all'array in uno dei `data/data_mcq_*.js`:
   expl: "Spiegazione mostrata dopo la risposta" },
 ```
 
-Gli `id` devono essere univoci (le statistiche si agganciano all'id).
+Gli `id` devono essere univoci, perché le statistiche si agganciano all’id della domanda.
+
+## Segnalazioni e contributi
+
+Se trovi bug, errori nelle risposte, refusi, esercizi poco chiari o hai nuove domande da proporre, apri pure una **issue**.
+
+Sono benvenute anche **pull request** per correggere contenuti, migliorare spiegazioni, aggiungere esercizi o sistemare eventuali problemi dell’interfaccia.
 
 ## Fonti
 
-Riassunto del corso, slide (SO-merged), Tanenbaum, fac-simile della prova scritta, testimonianze d'esame ed esercizi svolti.
+Riassunto del corso, slide del corso, Tanenbaum, fac-simile della prova scritta, testimonianze d’esame ed esercizi svolti.
