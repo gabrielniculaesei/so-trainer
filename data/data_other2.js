@@ -234,5 +234,37 @@ cioè al massimo <b>1 fault ogni 800.000 accessi</b>.</li>
 <li>Frame: 1 MB / 2 KB = 2²⁰/2¹¹ = 2⁹ = <b>512 frame</b> ⇒ numero di frame a <b>9 bit</b> (sta comodamente in una voce insieme ai bit di controllo).</li>
 <li>Tabella = 8192 · 4 B = <b>32 KB</b> ⇒ 32 KB / 2 KB = <b>16 pagine</b> solo per la tabella! Con un 2° livello si materializzano solo le parti realmente usate dello spazio virtuale.</li>
 </ol>
-<p><b>Schema riassuntivo</b>: bit offset = log₂(dim pagina); bit numero pagina = bit virtuali − bit offset; voci = 2^(bit numero pagina); frame = RAM / dim pagina. L'indirizzo FISICO non influenza mai il numero di voci.</p>` }
+<p><b>Schema riassuntivo</b>: bit offset = log₂(dim pagina); bit numero pagina = bit virtuali − bit offset; voci = 2^(bit numero pagina); frame = RAM / dim pagina. L'indirizzo FISICO non influenza mai il numero di voci.</p>` },
+
+{ id:"ex215", topic:"fs", title:"I-node: quanti accessi al disco per aprire un file?",
+  text:`<p>File system UNIX a i-node. Si vuole aprire il file <code>/usr/carlo/documenti</code>.</p>
+<p>L'i-node della radice <code>/</code> è già in RAM. Ogni directory occupa un solo blocco dati e ogni i-node sta in un blocco a sé; nessun altro blocco è in cache.</p>
+<p>1) Quanti accessi al disco servono per raggiungere l'i-node di <code>documenti</code>?<br>
+2) E per leggere anche il primo blocco di dati del file?</p>`,
+  sol:`<p>La radice è in RAM, quindi si parte dal suo blocco dati. Ogni livello del percorso costa due accessi: leggere il blocco dati della directory padre (per trovare la voce e il numero di i-node del figlio) e poi leggere l'i-node del figlio.</p>
+<ol>
+<li>leggo il blocco dati di <code>/</code> → trovo «usr» e il suo numero di i-node</li>
+<li>leggo l'i-node di <code>/usr</code></li>
+<li>leggo il blocco dati di <code>/usr</code> → trovo «carlo»</li>
+<li>leggo l'i-node di <code>/usr/carlo</code></li>
+<li>leggo il blocco dati di <code>/usr/carlo</code> → trovo «documenti»</li>
+<li>leggo l'i-node di <code>/usr/carlo/documenti</code></li>
+</ol>
+<p>1) <b>6 accessi</b> per l'i-node del file (= 2 × 3 componenti, con la radice già in RAM).<br>
+2) Leggere anche il primo blocco dati del file: <b>7 accessi</b>.</p>
+<p><b>Regola</b>: con la radice in RAM servono <b>2·k</b> accessi per l'i-node del file (k = componenti del percorso), <b>+1</b> per leggerne il primo blocco dati. Se anche l'i-node della radice fosse su disco, sarebbe +1 all'inizio.</p>` },
+
+{ id:"ex216", topic:"memoria", title:"Tabella a 2 livelli: quanta memoria occupa davvero",
+  text:`<p>Paginazione a 2 livelli su 32 bit: 10 bit per l'indice di 1° livello, 10 bit per quello di 2° livello, 12 bit di offset (pagine da 4 KB). Ogni tabella (L1 o L2) occupa esattamente una pagina da 4 KB (1024 voci × 4 byte).</p>
+<p>Un processo usa <b>solo due</b> regioni dello spazio virtuale: <b>[0, 1.000.000]</b> e <b>[4.200.000, 5.200.000]</b>.</p>
+<p>1) Quanta memoria fisica occupano le sue tabelle delle pagine?<br>
+2) Confronto con una tabella a un solo livello.</p>`,
+  sol:`<p>Ogni voce di L1 copre 2²² byte = <b>4 MB</b> (1024 pagine × 4 KB). Una tabella L2 va materializzata solo per gli indici L1 effettivamente toccati.</p>
+<ol>
+<li>Regione [0, 1.000.000]: sta tutta nell'indice L1 <b>0</b> (0 … 4.194.303) ⇒ serve <b>1 tabella L2</b>.</li>
+<li>Regione [4.200.000, 5.200.000]: entrambi gli estremi cadono in [4.194.304, 8.388.607], cioè indice L1 <b>1</b> ⇒ serve <b>1 tabella L2</b>.</li>
+</ol>
+<p>Totale: <b>1 tabella L1 + 2 tabelle L2 = 3 pagine × 4 KB = 12 KB</b>.</p>
+<p>2) Una tabella a un solo livello avrebbe 2²⁰ voci × 4 byte = <b>4 MB sempre residenti</b>, indipendentemente da quanto spazio è realmente usato. Il multilivello materializza solo le L2 delle zone davvero indirizzate.</p>
+<p><b>Attenzione</b>: se una regione attraversasse più multipli di 4 MB, servirebbe una L2 per <i>ciascun</i> indice L1 toccato.</p>` }
 );

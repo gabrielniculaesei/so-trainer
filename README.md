@@ -2,6 +2,8 @@
 
 Web app statica per prepararsi allo scritto e all'orale. Nessuna dipendenza, nessun build: **basta aprire `index.html` nel browser** (doppio click).
 
+🔗 **Online**: <!-- TODO: link Vercel dopo il deploy -->
+
 In alternativa, per servirla via HTTP:
 
 ```bash
@@ -14,10 +16,10 @@ python3 -m http.server 8080
 
 | File | Contenuto |
 |---|---|
-| `data_mcq_1..6.js` | Banca di 268 domande a risposta multipla in stile esame (opzioni A–E), divise per argomento |
-| `data_other.js`, `data_other2.js` | 45 domande da orale con risposte modello + 31 esercizi risolti passo-passo |
-| `data_extra.js` | 16 domande da orale aggiuntive + 14 domande aperte di teoria (risposta discorsiva con risposta modello) |
-| `generators.js`, `generators2.js` | 24 generatori di esercizi con parametri casuali e soluzione calcolata (FAT, i-node, EAT/TLB, scheduling disco e CPU, sostituzione pagine, RAID/XOR, pipeline, semafori, aging…) |
+| `data/data_mcq_1..7.js` | Banca di 278 domande a risposta multipla in stile esame (opzioni A–E), divise per argomento |
+| `data/data_other.js`, `data/data_other2.js` | 45 domande da orale con risposte modello + 33 esercizi risolti passo-passo |
+| `data/data_extra.js` | 20 domande da orale aggiuntive + 17 domande aperte di teoria (risposta discorsiva con risposta modello) |
+| `data/generators.js`, `data/generators2.js` | 25 generatori di esercizi con parametri casuali e soluzione calcolata (FAT, i-node, EAT/TLB, scheduling disco e CPU, sostituzione pagine, RAID/XOR, pipeline, semafori, aging…) |
 | `app.js` | Logica: terminale interattivo, quiz, simulazione esame con timer, flashcard orale, domande aperte, statistiche (localStorage) |
 
 ## Modalità
@@ -32,10 +34,10 @@ python3 -m http.server 8080
 
 ## Aggiungere domande
 
-Aggiungi un oggetto all'array in uno dei `data_mcq_*.js`:
+Aggiungi un oggetto all'array in uno dei `data/data_mcq_*.js`:
 
 ```js
-{ id: "xx99", topic: "memoria",      // vedi window.TOPICS in data_mcq_1.js
+{ id: "xx99", topic: "memoria",      // vedi window.TOPICS in data/data_mcq_1.js
   q: "Testo della domanda (HTML ok)",
   options: ["A", "B", "C", "D", "E"],
   correct: 2,                        // indice 0-based dell'opzione giusta
@@ -46,6 +48,4 @@ Gli `id` devono essere univoci (le statistiche si agganciano all'id).
 
 ## Fonti
 
-Riassunto del corso, slide (SO-merged), Tanenbaum, fac-simile della prova scritta, testimonianze d'esame ed esercizi svolti (Esercizi2).
-
-Note d'esame incorporate: nomenclatura delle slide (down/up su full/empty/mutex), convenzione LOOK per l'inversione della testina nel compito, trappole classiche (puntatore nei blocchi della lista linkata, voci della tabella ≠ f(indirizzo fisico), ecc.).
+Riassunto del corso, slide (SO-merged), Tanenbaum, fac-simile della prova scritta, testimonianze d'esame ed esercizi svolti.

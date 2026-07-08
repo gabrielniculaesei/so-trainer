@@ -272,6 +272,44 @@ ${tab}
     }
   });
 
+  // Risoluzione di un percorso in UNIX: numero di accessi al disco
+  window.GENERATORS.push({
+    id: "gpath", topic: "fs", title: "File system UNIX: accessi al disco per aprire un file",
+    gen() {
+      const dirs = ["usr", "home", "var", "opt", "mnt", "srv"];
+      const subs = ["carlo", "anna", "luca", "sara", "progetti", "corsi", "lavoro", "tesi"];
+      const leaves = ["documenti", "appunti", "relazione", "main.c", "note.txt", "dati", "foto.jpg"];
+      const depth = ri(2, 4); // componenti sotto la radice
+      const parts = [pick(dirs)];
+      while (parts.length < depth - 1) parts.push(pick(subs));
+      parts.push(pick(leaves));
+      const path = "/" + parts.join("/");
+      const rootCached = Math.random() < 0.5;
+      const k = parts.length;
+
+      const steps = [];
+      if (!rootCached) steps.push(`leggo l'i-node della radice <code>/</code>`);
+      for (let i = 0; i < parts.length; i++) {
+        const parent = i === 0 ? "/" : "/" + parts.slice(0, i).join("/");
+        const child = "/" + parts.slice(0, i + 1).join("/");
+        steps.push(`leggo il blocco dati di <code>${parent}</code> → trovo «${parts[i]}» e il suo numero di i-node`);
+        steps.push(`leggo l'i-node di <code>${child}</code>`);
+      }
+      const toInode = 2 * k + (rootCached ? 0 : 1);
+      const toData = toInode + 1;
+
+      const text = `<p>File system UNIX a i-node. Si vuole aprire il file <code>${path}</code>.</p>
+<p>${rootCached ? "L'i-node della radice <code>/</code> è già in RAM." : "Nessun blocco è in cache, nemmeno l'i-node della radice."} Ogni directory occupa un solo blocco dati e ogni i-node sta in un blocco a sé.</p>
+<p>1) Quanti accessi al disco per raggiungere l'i-node del file? 2) E per leggerne anche il primo blocco di dati?</p>`;
+      const sol = `<p>Ogni componente del percorso costa due accessi: il blocco dati della directory padre (per trovare la voce e il numero di i-node del figlio) e poi l'i-node del figlio.</p>
+<ol>${steps.map(s => `<li>${s}</li>`).join("")}</ol>
+<p>1) <b>${toInode} accessi</b> per l'i-node del file ${rootCached ? `(= 2 × ${k} componenti, radice già in RAM)` : `(= 2 × ${k} componenti + 1 per l'i-node della radice)`}.<br>
+2) Leggere anche il primo blocco dati: <b>${toData} accessi</b>.</p>
+<p><b>Regola</b>: 2·k accessi per l'i-node (k = componenti del percorso), +1 per il primo blocco dati, +1 se la radice va letta da disco.</p>`;
+      return { text, sol };
+    }
+  });
+
   // esposti per i test
   window._sims2 = { diskDynLOOK, fitSim };
 })();
