@@ -15,7 +15,7 @@ Web app statica per prepararsi allo scritto e all’orale di Sistemi Operativi, 
 | `data/data_other.js`, `data/data_other2.js` | 45 domande da orale con risposte modello + 33 esercizi risolti passo-passo |
 | `data/data_extra.js` | 20 domande da orale aggiuntive + 17 domande aperte di teoria, con risposta modello |
 | `data/generators.js`, `data/generators2.js` | 25 generatori di esercizi con parametri casuali e soluzione calcolata: FAT, i-node, EAT/TLB, scheduling disco e CPU, sostituzione pagine, RAID/XOR, pipeline, semafori, aging… |
-| `app.js` | Logica dell’app: terminale interattivo, quiz, simulazione esame con timer, flashcard orale, domande aperte e statistiche salvate nel browser tramite localStorage |
+| `js/app.js` | Logica dell’app: terminale interattivo, quiz, simulazione esame con timer, flashcard orale, domande aperte e statistiche salvate nel browser tramite localStorage |
 
 ## Modalità
 
