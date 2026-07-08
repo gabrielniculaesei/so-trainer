@@ -266,5 +266,70 @@ cioè al massimo <b>1 fault ogni 800.000 accessi</b>.</li>
 </ol>
 <p>Totale: <b>1 tabella L1 + 2 tabelle L2 = 3 pagine × 4 KB = 12 KB</b>.</p>
 <p>2) Una tabella a un solo livello avrebbe 2²⁰ voci × 4 byte = <b>4 MB sempre residenti</b>, indipendentemente da quanto spazio è realmente usato. Il multilivello materializza solo le L2 delle zone davvero indirizzate.</p>
-<p><b>Attenzione</b>: se una regione attraversasse più multipli di 4 MB, servirebbe una L2 per <i>ciascun</i> indice L1 toccato.</p>` }
+<p><b>Attenzione</b>: se una regione attraversasse più multipli di 4 MB, servirebbe una L2 per <i>ciascun</i> indice L1 toccato.</p>` },
+
+{ id:"ex217", topic:"memoria", title:"Tempo di accesso medio con memoria cache",
+  text:`<p>Una CPU consulta una <b>cache</b> prima della RAM. Tempo di accesso alla cache = <b>5 ns</b>, tempo di accesso alla RAM = <b>100 ns</b>, <b>hit ratio</b> della cache = <b>95%</b>.</p>
+<p>1) Calcolare il tempo di accesso medio alla memoria.<br>
+2) Come cambia se il controllore aggiunge un <b>overhead</b> fisso di 2 ns a ogni accesso?<br>
+3) Quale hit ratio servirebbe per avere un tempo medio ≤ 8 ns (senza overhead)?</p>`,
+  sol:`<p>In caso di <b>hit</b> si paga solo la cache; in caso di <b>miss</b> si paga la ricerca in cache <i>e poi</i> l'accesso alla RAM: t<sub>miss</sub> = 5 + 100 = 105 ns.</p>
+<ol>
+<li>T = h·t<sub>hit</sub> + (1−h)·t<sub>miss</sub> = 0,95·5 + 0,05·105 = 4,75 + 5,25 = <b>10 ns</b>.<br>
+Forma equivalente: T = t<sub>cache</sub> + (1−h)·t<sub>RAM</sub> = 5 + 0,05·100 = <b>10 ns</b>.</li>
+<li>Con overhead fisso: T = 2 + 10 = <b>12 ns</b> (l'overhead si somma a ogni accesso, hit o miss).</li>
+<li>8 ≥ 5 + (1−h)·100 ⇒ 3 ≥ (1−h)·100 ⇒ 1−h ≤ 0,03 ⇒ <b>h ≥ 97%</b>.</li>
+</ol>
+<p><b>Nota</b>: è la stessa struttura dell'EAT con TLB (media pesata hit/miss), qui applicata alla gerarchia cache–RAM. Questa "formulona" (tempo medio con cache hit, cache miss ed eventuale overhead) è comparsa allo scritto; il termine di miss domina il tempo medio, per questo si punta a hit ratio altissimi.</p>` },
+
+{ id:"ex218", topic:"intro", title:"Pipeline: throughput e latenza",
+  text:`<p>Una CPU ha una pipeline a <b>3 stadi</b>; ogni stadio impiega <b>6 ns</b> per completare il proprio lavoro.</p>
+<p>1) Qual è il throughput della CPU a regime (istruzioni al secondo)?<br>
+2) Qual è la latenza di una singola istruzione?<br>
+3) Quanto tempo serve per completare 1000 istruzioni (pipeline inizialmente vuota)?</p>`,
+  sol:`<ol>
+<li>A regime esce <b>1 istruzione ogni 6 ns</b> (il periodo è dettato da un solo stadio, non dalla loro somma) ⇒ throughput = 1 / (6·10⁻⁹ s) ≈ <b>166.666.667 istruzioni/s ≈ 166,7 MIPS</b>.</li>
+<li>Latenza = 3 stadi · 6 ns = <b>18 ns</b> (tempo di attraversamento di UNA istruzione dall'ingresso all'uscita).</li>
+<li>La prima istruzione esce dopo 18 ns; le altre 999 escono una ogni 6 ns:<br>
+T = (3 + 1000 − 1)·6 = 1002·6 = <b>6012 ns</b>.</li>
+</ol>
+<p><b>Attenzione (apparso all'esame)</b>: throughput ≠ 1/latenza. Il throughput dipende dallo stadio più lento (qui 1 ogni 6 ns), NON dai 18 ns di attraversamento. La pipeline aumenta il throughput, non riduce la latenza della singola istruzione.</p>` },
+
+{ id:"ex219", topic:"fs", title:"Allocazione indicizzata a due livelli: file da 1 MB",
+  text:`<p>File system con <b>allocazione indicizzata a due livelli</b>: blocco logico da <b>512 byte</b>, indirizzi di blocco da <b>4 byte</b>. L'indice di 1° livello punta a blocchi indice di 2° livello, che a loro volta puntano ai blocchi di dati del file.</p>
+<p>Per un file da <b>1 MB</b>:</p>
+<ol><li>Quanti indirizzi entrano in un blocco indice?</li>
+<li>Quanti blocchi occupa il file in totale (dati + indici)?</li>
+<li>Come si accede al suo 400° blocco?</li>
+<li>Come si accede al byte 236.448?</li>
+<li>Qual è la dimensione massima di un file e quanti blocchi occupa al massimo?</li></ol>`,
+  sol:`<ol>
+<li>Indirizzi per blocco = 512 / 4 = <b>128 puntatori</b>.</li>
+<li>Dati: 1 MB / 512 = 1.048.576 / 512 = <b>2048 blocchi dati</b>. Servono ⌈2048/128⌉ = <b>16 blocchi indice di 2° livello</b>, più <b>1 blocco indice di 1° livello</b> ⇒ totale = 2048 + 16 + 1 = <b>2065 blocchi</b>.</li>
+<li>Il blocco n. 400 è indicizzato dal blocco indice di 2° livello n. ⌊400/128⌋ = <b>3</b>, alla posizione 400 mod 128 = <b>16</b> al suo interno. Quel blocco di 2° livello è a sua volta puntato dal 4° indirizzo (indice 3) dell'indice di 1° livello, che occupa i byte 12–15 del blocco di 1° livello.</li>
+<li>Il byte 236.448 sta nel blocco ⌊236.448 / 512⌋ = <b>461</b> (contando da 0 ⇒ 462° blocco), all'offset 236.448 mod 512 = <b>416</b>. Individuato il blocco, lo si raggiunge come al punto 3.</li>
+<li>Con 128 puntatori nell'indice di 1° livello e 128 in ciascuno di 2° livello: max = 128 × 128 = 16.384 blocchi dati ⇒ <b>16.384 × 512 = 8 MB</b> (8.388.608 byte). Occupa al massimo 16.384 + 128 + 1 = <b>16.513 blocchi</b>.</li>
+</ol>
+<p><b>Metodo generale</b>: blocco del file k = ⌊byte / dim_blocco⌋; indice di 2° livello = ⌊k / P⌋, posizione nel blocco = k mod P (con P = puntatori per blocco). La dimensione massima è P²·dim_blocco.</p>` },
+
+{ id:"ex220", topic:"dischi", title:"SCAN con richieste che arrivano nel tempo + tempo di attesa medio",
+  text:`<p>Disco con tracce da <b>0 a 100</b>, gestito con politica <b>SCAN</b>. All'istante 0 la testina è sul cilindro <b>40</b> in direzione <b>ascendente</b>; lo spostamento a una traccia adiacente richiede <b>2 ms</b> (si trascuri la latenza).</p>
+<p>Arrivano richieste per i cilindri <b>90, 45, 40, 60, 55</b> rispettivamente agli istanti <b>0, 20, 30, 40, 80 ms</b>.</p>
+<p>1) In che ordine vengono servite? 2) Qual è il tempo di attesa medio (dall'istante di arrivo a quello di servizio)?</p>`,
+  sol:`<p>La testina sale da 40 a 0,5 tracce/ms (2 ms/traccia). Posizione all'arrivo di ciascuna richiesta:</p>
+<div class="tablewrap"><table>
+<tr><th>richiesta</th><th>arrivo</th><th>posizione testina</th><th>quando servita</th></tr>
+<tr><td>90</td><td>0</td><td>40 (sale)</td><td>t=100</td></tr>
+<tr><td>45</td><td>20</td><td>50 → già superata, al ritorno</td><td>t=230</td></tr>
+<tr><td>40</td><td>30</td><td>55 → già superata, al ritorno</td><td>t=240</td></tr>
+<tr><td>60</td><td>40</td><td>60 → esattamente sotto la testina</td><td>t=40</td></tr>
+<tr><td>55</td><td>80</td><td>80 → già superata, al ritorno</td><td>t=210</td></tr>
+</table></div>
+<p>Salendo la testina serve 60 (t=40) e 90 (t=100), prosegue fino all'estremo fisico <b>100</b> (t=120, SCAN va sempre al bordo), poi inverte e scendendo serve 55 (t=210), 45 (t=230), 40 (t=240).</p>
+<ol>
+<li><b>Ordine di servizio: 60, 90, 55, 45, 40.</b></li>
+<li>Tempi di attesa (servizio − arrivo): 60: 40−40=0; 90: 100−0=100; 55: 210−80=130; 45: 230−20=210; 40: 240−30=210.<br>
+Media = (0 + 100 + 130 + 210 + 210) / 5 = 650 / 5 = <b>130 ms</b>.</li>
+</ol>
+<p><b>Attenzione</b>: SCAN (a differenza di LOOK) arriva sempre all'estremo fisico del disco (qui 100) prima di invertire. Traccia SEMPRE la posizione della testina all'istante di ogni arrivo: se la richiesta è già stata oltrepassata nel verso corrente, verrà servita solo al ritorno.</p>` }
 );

@@ -4,6 +4,8 @@
   const pick = arr => arr[ri(0, arr.length - 1)];
   const fmt = n => n.toLocaleString("it-IT");
   const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = ri(0, i);[a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const human = b => b >= 2 ** 30 ? (b / 2 ** 30) + " GB" : b >= 2 ** 20 ? (b / 2 ** 20) + " MB" : b >= 1024 ? (b / 1024) + " KB" : b + " byte";
+  const log2 = n => Math.round(Math.log2(n));
 
   // LOOK con richieste dinamiche (stile compito-tipo, es. 7)
   function diskDynLOOK(head, initial, arrivals, maxTrack) {
@@ -306,6 +308,82 @@ ${tab}
 <p>1) <b>${toInode} accessi</b> per l'i-node del file ${rootCached ? `(= 2 × ${k} componenti, radice già in RAM)` : `(= 2 × ${k} componenti + 1 per l'i-node della radice)`}.<br>
 2) Leggere anche il primo blocco dati: <b>${toData} accessi</b>.</p>
 <p><b>Regola</b>: 2·k accessi per l'i-node (k = componenti del percorso), +1 per il primo blocco dati, +1 se la radice va letta da disco.</p>`;
+      return { text, sol };
+    }
+  });
+
+  // Tempo di accesso medio con memoria cache (hit/miss/overhead) — apparso all'esame come "formulona"
+  window.GENERATORS.push({
+    id: "gcache", topic: "memoria", title: "Tempo di accesso medio con cache (hit / miss / overhead)",
+    gen() {
+      const tc = pick([2, 5, 10]);          // tempo di accesso alla cache (ns)
+      const tm = pick([80, 100, 120, 150]); // tempo di accesso alla RAM (ns)
+      const h = pick([85, 90, 95, 98]);     // hit ratio della cache (%)
+      const ov = pick([0, 0, 1, 2]);        // overhead fisso del controllore per ogni accesso (ns)
+      const miss = 100 - h;
+      const tHit = tc;
+      const tMiss = tc + tm;                 // miss: prima cerco in cache, poi vado in RAM
+      const eat = ov + (h / 100) * tHit + (miss / 100) * tMiss;
+      const ovTxt = ov ? ` A ogni accesso si aggiunge un <b>overhead</b> fisso del controllore di <b>${ov} ns</b>.` : "";
+      const text = `<p>Una CPU consulta una <b>cache</b> prima della RAM. Tempo di accesso alla cache = <b>${tc} ns</b>, tempo di accesso alla RAM = <b>${tm} ns</b>, <b>hit ratio</b> della cache = <b>${h}%</b>.${ovTxt}</p>
+<p><b>Calcolare il tempo di accesso medio alla memoria.</b> (In caso di miss si paga la ricerca in cache <i>e poi</i> l'accesso alla RAM.)</p>`;
+      const sol = `<ol>
+<li><b>Hit</b> (${h}%): il dato è in cache ⇒ t<sub>hit</sub> = ${tc} ns.</li>
+<li><b>Miss</b> (${miss}%): cache + RAM ⇒ t<sub>miss</sub> = ${tc} + ${tm} = ${tMiss} ns.</li>
+<li>T<sub>medio</sub> = ${ov ? `${ov} (overhead) + ` : ""}${h / 100}·${tc} + ${miss / 100}·${tMiss} = <b>${(+eat.toFixed(2))} ns</b>.</li>
+<li>Forma equivalente: T = ${ov ? "overhead + " : ""}t<sub>cache</sub> + (1−h)·t<sub>RAM</sub> = ${ov ? ov + " + " : ""}${tc} + ${miss / 100}·${tm} = <b>${(+eat.toFixed(2))} ns</b>.</li></ol>
+<p><b>Formula</b>: T = h·t<sub>cache</sub> + (1−h)·(t<sub>cache</sub> + t<sub>RAM</sub>) ${ov ? "+ overhead " : ""}= t<sub>cache</sub> + (1−h)·t<sub>RAM</sub>${ov ? " + overhead" : ""}. È la stessa struttura dell'EAT con TLB, ma applicata alla gerarchia cache–RAM anziché TLB–tabella delle pagine.</p>`;
+      return { text, sol };
+    }
+  });
+
+  // Dimensione della tabella delle pagine ricavando la voce dall'indirizzo fisico (framing d'esame)
+  window.GENERATORS.push({
+    id: "gptphys", topic: "memoria", title: "Tabella delle pagine: dimensione a partire dall'indirizzo fisico",
+    gen() {
+      const pageKB = pick([1, 2, 4, 8]);
+      const offBits = log2(pageKB * 1024);
+      const vBits = pick([26, 28, 30, 32]);
+      const physBits = pick([22, 24, 26, 28]);
+      const nPageBits = vBits - offBits;
+      const nPages = 2 ** nPageBits;
+      const entryBytes = Math.ceil(physBits / 8);   // la voce deve contenere l'indirizzo fisico
+      const table = nPages * entryBytes;
+      const frameBits = physBits - offBits;
+      const frameBytes = Math.ceil(frameBits / 8);
+      const tableTight = nPages * frameBytes;
+      const text = `<p>Un sistema ha spazio di indirizzamento <b>virtuale da 2<sup>${vBits}</sup> byte</b> (${human(2 ** vBits)}), <b>pagine da ${pageKB} KB</b> e <b>indirizzi fisici a ${physBits} bit</b>. Ogni voce della tabella delle pagine deve poter contenere un indirizzo fisico.</p>
+<p><b>Quante voci ha la tabella delle pagine e quanto spazio occupa?</b></p>`;
+      const sol = `<ol>
+<li>Offset = log<sub>2</sub>(${pageKB} KB) = <b>${offBits} bit</b> ⇒ numero di pagina = ${vBits} − ${offBits} = <b>${nPageBits} bit</b>.</li>
+<li>Voci = 2<sup>${nPageBits}</sup> = <b>${fmt(nPages)}</b> (una per ogni pagina virtuale).</li>
+<li>Dimensione di una voce = indirizzo fisico a ${physBits} bit = ⌈${physBits}/8⌉ = <b>${entryBytes} byte</b>.</li>
+<li>Tabella = ${fmt(nPages)} · ${entryBytes} byte = <b>${human(table)}</b> (voci × dimensione dell'indirizzo fisico).</li></ol>
+<p><b>Affinamento</b>: in realtà nella voce basta il <i>numero di frame</i> (${physBits} − ${offBits} = ${frameBits} bit ⇒ ${frameBytes} byte), non l'indirizzo fisico completo: la tabella "minima" sarebbe ${fmt(nPages)}·${frameBytes} = ${human(tableTight)}. Nei compiti però si usa spesso l'indirizzo fisico intero come dimensione della voce.</p>
+<p><b>Trappola</b>: il numero di voci dipende SOLO da spazio virtuale e dimensione della pagina; l'indirizzo fisico serve solo a dimensionare la singola voce.</p>`;
+      return { text, sol };
+    }
+  });
+
+  // Overhead % del context switch in Round-Robin (esercizi Terranova)
+  window.GENERATORS.push({
+    id: "goverhead", topic: "sched", title: "Overhead % del context switch nel Round-Robin",
+    gen() {
+      const cs = pick([1, 2, 4, 5, 10]);          // durata del context switch (ms)
+      const q = pick([20, 25, 40, 50, 80, 100]);  // quanto di tempo (ms)
+      const ov = cs / (q + cs) * 100;
+      const useful = q / (q + cs) * 100;
+      const target = pick([1, 2, 5]);             // overhead massimo desiderato (%)
+      const minQ = cs * (100 - target) / target;  // da cs/(q+cs) ≤ target
+      const text = `<p>Un sistema usa Round-Robin con un <b>context switch che dura ${cs} ms</b> e un <b>quanto di tempo di ${q} ms</b>.</p>
+<ol><li>Qual è la percentuale di <b>overhead</b> dovuta all'interlacciamento dei processi?</li>
+<li>Quale percentuale del tempo di CPU resta per il lavoro utile?</li>
+<li>Quale quanto minimo servirebbe per tenere l'overhead entro ${target === 1 ? "l'1" : "il " + target}%?</li></ol>`;
+      const sol = `<ol>
+<li>Overhead = tempo di context switch / tempo totale di un turno = ${cs} / (${q} + ${cs}) = <b>${(+ov.toFixed(2))}%</b>.</li>
+<li>Lavoro utile = ${q} / (${q} + ${cs}) = <b>${(+useful.toFixed(2))}%</b> (i due valori sommano al 100%).</li>
+<li>Dalla condizione ${cs}/(q+${cs}) ≤ ${target / 100} ⇒ q ≥ ${cs}·(100−${target})/${target} = <b>${(+minQ.toFixed(1))} ms</b>.</li></ol>
+<p><b>Formula</b>: overhead% = t<sub>cs</sub> / (q + t<sub>cs</sub>). Un quanto piccolo → sistema reattivo ma overhead alto; un quanto grande → poco overhead ma il RR degenera in FCFS. In generale l'overhead di un SO è (tempo di CPU speso nei moduli del kernel) / (tempo totale di CPU).</p>`;
       return { text, sol };
     }
   });
