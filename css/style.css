@@ -21,6 +21,14 @@
   --term-text: #b8dcc2;
   --term-dim: #6f9a7d;
   --shadow: 0 1px 2px rgba(40, 42, 30, .08);
+
+  /* palette semantica condivisa dalle simulazioni (si adatta al tema) */
+  --sem-active: var(--accent);     /* elemento in esecuzione / servito */
+  --sem-candidate: var(--amber);   /* candidato in valutazione */
+  --sem-victim: var(--err);        /* vittima / espulso */
+  --sem-hit: var(--accent);        /* successo / hit */
+  --sem-miss: var(--err);          /* miss / errore */
+  --sem-wait: var(--dim);          /* in attesa */
 }
 :root[data-theme="dark"] {
   --bg: #0c110e;
@@ -320,7 +328,12 @@ textarea.answerbox:focus { outline: none; border-color: var(--accent); }
   transition: border-color .12s ease, transform .12s ease;
 }
 .simtile:hover { border-color: var(--accent); transform: translateY(-1px); }
-.simtile-icon { font-size: 1.55rem; line-height: 1.2; }
+.simtile-icon {
+  font-family: var(--mono); font-weight: 700; font-size: .8rem;
+  color: var(--accent); background: var(--accent-soft);
+  border: 1px solid var(--accent); border-radius: 5px;
+  padding: .18rem .4rem; line-height: 1.2; white-space: nowrap; flex-shrink: 0;
+}
 .simtile-body { flex: 1; display: flex; flex-direction: column; gap: .3rem; }
 .simtile-title { font-weight: 700; font-size: .95rem; letter-spacing: -.01em; }
 .simtile-desc { color: var(--dim); font-size: .82rem; line-height: 1.45; }
@@ -346,8 +359,27 @@ textarea.answerbox:focus { outline: none; border-color: var(--accent); }
   padding: .3rem .45rem; border-radius: 6px; border: 1px solid var(--border);
   background: var(--surface); color: var(--text); font-family: var(--mono); font-size: .82rem;
 }
-.sim-controls { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; margin: .55rem 0; }
+.sim-controls { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; margin: .55rem 0 .3rem; }
+.sp-speed-l { display: inline-flex; align-items: center; gap: .35rem; font-family: var(--mono); font-size: .78rem; color: var(--dim); }
+.sp-speed {
+  padding: .22rem .35rem; border-radius: 5px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text); font-family: var(--mono); font-size: .78rem;
+}
+/* scrubber per saltare a un passo */
+.sp-scrub { width: 100%; margin: .1rem 0 .5rem; accent-color: var(--accent); cursor: pointer; }
 .sim-stage { overflow-x: auto; padding-top: .25rem; }
+/* transizione morbida tra un passo e l'altro */
+.sim-stage.sim-anim { animation: simstep .28s ease; }
+@keyframes simstep { from { opacity: .35; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+/* la prima riga di narrazione (msg del passo) fa da "voce" che accompagna la scena */
+.sim-stage > .sim-msg:first-child {
+  border-left-width: 4px; font-weight: 600; font-size: .92rem;
+  background: var(--accent-soft); color: var(--text);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sim-stage.sim-anim { animation: none; }
+  .view.active { animation: none; }
+}
 .sim-svg { display: block; height: auto; margin: .5rem 0; max-width: 100%; }
 .sim-row { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
 .sim-cols { display: grid; gap: .4rem 1.2rem; grid-template-columns: repeat(auto-fit, minmax(220px, max-content)); align-items: start; margin: .5rem 0; }
@@ -411,4 +443,66 @@ label { font-size: .92rem; }
   .statrow .lbl { width: 120px; }
   html { font-size: 15px; }
   .brand { display: none; }
+  /* nav scrollabile invece di traboccare su più righe */
+  .topbar { flex-wrap: nowrap; gap: .5rem; }
+  nav { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  nav::-webkit-scrollbar { display: none; }
+  nav button { white-space: nowrap; }
+  .sim-controls .btn { flex: 0 0 auto; }
 }
+
+/* focus visibile sui controlli (accessibilità da tastiera) */
+.chip:focus-visible, .btn:focus-visible, .opt:focus-visible, nav button:focus-visible,
+.simtile:focus-visible, .app:focus-visible, .sp-scrub:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+.chip:focus { outline: none; }
+
+/* ripasso del giorno (home) */
+.today { border-left: 3px solid var(--accent); }
+.today-h { font-family: var(--mono); font-size: .82rem; font-weight: 700; color: var(--accent); margin-bottom: .3rem; }
+.today-h::before { content: ">> "; }
+.today p { font-size: .9rem; color: var(--text); margin-bottom: .2rem; }
+
+/* banner "riprendi sessione" */
+.resume-banner {
+  display: flex; align-items: center; gap: .8rem; flex-wrap: wrap;
+  border: 1px solid var(--accent); background: var(--accent-soft);
+  border-radius: 8px; padding: .6rem .9rem; margin-bottom: 1rem;
+  font-size: .9rem;
+}
+.resume-banner .rb-actions { display: flex; gap: .5rem; margin-left: auto; }
+
+/* revisione errori a fine quiz */
+.review { text-align: left; margin-top: 1.2rem; }
+.review-h { font-family: var(--mono); font-size: .9rem; color: var(--err); margin-bottom: .6rem; }
+.review-h::before { content: ">> "; }
+.review-item { border: 1px solid var(--border); border-radius: 8px; padding: .7rem .85rem; margin-bottom: .6rem; }
+.review-q { font-weight: 600; margin-bottom: .45rem; }
+.review-line { font-size: .9rem; margin: .12rem 0; }
+.review-tag {
+  font-family: var(--mono); font-size: .7rem; font-weight: 700;
+  border-radius: 4px; padding: .04rem .35rem; margin-right: .35rem;
+}
+.review-line.err .review-tag { color: var(--err); border: 1px solid var(--err); }
+.review-line.ok .review-tag { color: var(--accent); border: 1px solid var(--accent); }
+.review-expl { font-size: .87rem; color: var(--dim); margin-top: .4rem; border-left: 3px solid var(--border); padding-left: .6rem; }
+
+/* toast e dialogo di conferma */
+#toast {
+  position: fixed; left: 50%; bottom: 1.4rem; transform: translate(-50%, 140%);
+  background: var(--term-bg); color: var(--term-text);
+  font-family: var(--mono); font-size: .85rem;
+  padding: .6rem 1rem; border-radius: 8px; box-shadow: 0 6px 24px rgba(10, 20, 14, .3);
+  z-index: 200; max-width: 90vw; text-align: center; transition: transform .25s ease; pointer-events: none;
+}
+#toast.show { transform: translate(-50%, 0); }
+.modal-back {
+  position: fixed; inset: 0; z-index: 210; display: flex; align-items: center; justify-content: center;
+  background: rgba(10, 16, 12, .55); padding: 1rem; animation: fadein .12s ease;
+}
+.modal {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1.1rem 1.2rem; max-width: 420px; box-shadow: 0 10px 40px rgba(10, 20, 14, .3);
+}
+.modal p { font-size: .95rem; margin-bottom: 1rem; }

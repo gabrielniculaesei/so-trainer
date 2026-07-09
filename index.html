@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SO Trainer — Sistemi Operativi</title>
-<meta name="description" content="Quiz, esercizi, simulazioni d'esame, flashcard e domande aperte per prepararsi all'esame di Sistemi Operativi.">
+<meta name="description" content="Quiz, esercizi, simulazioni d'esame e flashcard per prepararsi all'esame di Sistemi Operativi.">
 <link rel="stylesheet" href="css/style.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2216%22 fill=%22%2314201a%22/><text x=%2216%22 y=%2268%22 font-family=%22monospace%22 font-size=%2252%22 fill=%22%234ade80%22>&gt;_</text></svg>">
 
@@ -12,12 +12,12 @@
 <meta property="og:site_name" content="SO Trainer">
 <meta property="og:url" content="https://so-trainer.vercel.app/">
 <meta property="og:title" content="SO Trainer — Sistemi Operativi">
-<meta property="og:description" content="Allenati con quiz, esercizi, simulazioni d'esame, flashcard e domande aperte per scritto e orale.">
+<meta property="og:description" content="Allenati con quiz, esercizi, simulazioni d'esame e flashcard per scritto e orale.">
 <meta property="og:image" content="https://so-trainer.vercel.app/img/logo.png">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="SO Trainer — Sistemi Operativi">
-<meta name="twitter:description" content="Quiz, esercizi, simulazioni d'esame, flashcard e domande aperte per prepararsi all'esame di Sistemi Operativi.">
+<meta name="twitter:description" content="Quiz, esercizi, simulazioni d'esame e flashcard per prepararsi all'esame di Sistemi Operativi.">
 <meta name="twitter:image" content="https://so-trainer.vercel.app/img/logo.png">
 
 <meta name="theme-color" content="#14201a">
@@ -43,7 +43,6 @@
       <button data-view="sim">sim</button>
       <button data-view="esame">esame</button>
       <button data-view="orale">orale</button>
-      <button data-view="aperte">aperte</button>
       <button data-view="stats">stats</button>
     </nav>
     <div class="spacer"></div>
@@ -53,8 +52,17 @@
 
 <main>
 
+  <div id="resumeBanner" class="resume-banner hidden">
+    <span class="rb-text"></span>
+    <div class="rb-actions">
+      <button class="btn small rb-yes">riprendi</button>
+      <button class="btn small secondary rb-no">ricomincia</button>
+    </div>
+  </div>
+
   <!-- ==================== HOME ==================== -->
   <section id="view-home" class="view active">
+    <div id="todayBox" class="card today"></div>
     <div class="term" id="homeTerm">
       <div class="term-bar">
         <span class="winbtns"><span class="r"></span><span class="y"></span><span class="g"></span></span>
@@ -89,11 +97,7 @@
       </button>
       <button class="app" data-view="orale">
         <span class="app-cmd">orale</span>
-        <span class="app-desc">flashcard: leggi, rispondi a voce, confronta</span>
-      </button>
-      <button class="app" data-view="aperte">
-        <span class="app-cmd">aperte</span>
-        <span class="app-desc">domande aperte di teoria: imposta la risposta, poi confronta</span>
+        <span class="app-desc">flashcard di teoria: leggi, rispondi, valuta — con ripasso dilazionato</span>
       </button>
       <button class="app" data-view="stats">
         <span class="app-cmd">stats</span>
@@ -125,7 +129,7 @@
         <div class="qmeta" id="quizMeta"></div>
         <div class="qtext" id="quizQText"></div>
         <div class="options" id="quizOptions"></div>
-        <div class="expl hidden" id="quizExpl"></div>
+        <div class="expl hidden" id="quizExpl" aria-live="polite"></div>
         <div class="quiz-controls">
           <button class="btn hidden" id="quizNextBtn">prossima →</button>
           <button class="btn secondary small" id="quizAbortBtn">interrompi</button>
@@ -217,7 +221,7 @@
         </div>
       </div>
       <div class="exam-nav">
-        <span id="examTimer" class="hidden"></span>
+        <span id="examTimer" class="hidden" aria-live="polite" aria-label="tempo rimanente"></span>
         <div class="spacer"></div>
         <button class="btn ok" id="examSubmitBtn">consegna il compito</button>
       </div>
@@ -226,10 +230,10 @@
 
   <!-- ==================== ORALE ==================== -->
   <section id="view-orale" class="view">
-    <h1>preparazione orale</h1>
+    <h1>preparazione orale e teoria</h1>
 
     <div id="oralSetup">
-      <p class="lead">Leggi la domanda, rispondi <b>ad alta voce</b> come all'orale, poi mostra la risposta modello e valutati con onestà. Le domande mai viste o sbagliate hanno priorità.</p>
+      <p class="lead">Flashcard di teoria: leggi la domanda, rispondi <b>ad alta voce</b> (o scrivi la traccia qui sotto), poi mostra la risposta modello e valutati con onestà. La ripetizione dilazionata riporta in cima le carte in scadenza.</p>
       <div class="chips" id="oralChips"></div>
       <div class="card">
         <div class="quiz-controls">
@@ -243,6 +247,7 @@
       <div class="card flashcard">
         <div class="qmeta" id="oralMeta"></div>
         <div class="fc-q" id="oralQ"></div>
+        <textarea class="answerbox" id="oralAnswer" placeholder="Imposta qui la tua risposta (facoltativo)…"></textarea>
         <div class="fc-a hidden" id="oralA"></div>
         <div class="quiz-controls">
           <button class="btn" id="oralShowBtn">mostra la risposta</button>
@@ -256,39 +261,6 @@
     </div>
   </section>
 
-  <!-- ==================== APERTE ==================== -->
-  <section id="view-aperte" class="view">
-    <h1>domande aperte</h1>
-
-    <div id="apSetup">
-      <p class="lead">Domande di teoria da esporre per esteso. Imposta la risposta, poi confrontala con quella modello (i punti che una buona risposta deve toccare).</p>
-      <div class="chips" id="apChips"></div>
-      <div class="card">
-        <div class="quiz-controls">
-          <button class="btn" id="apStartBtn">inizia</button>
-          <span id="apCount" class="badge"></span>
-        </div>
-      </div>
-    </div>
-
-    <div id="apPlay" class="hidden">
-      <div class="card flashcard">
-        <div class="qmeta" id="apMeta"></div>
-        <div class="fc-q" id="apQ"></div>
-        <textarea class="answerbox" id="apAnswer" placeholder="Imposta qui la tua risposta (facoltativo)…"></textarea>
-        <div class="fc-a hidden" id="apA"></div>
-        <div class="quiz-controls">
-          <button class="btn" id="apShowBtn">mostra la risposta modello</button>
-          <div id="apGrade" class="hidden" style="display:flex;gap:.6rem;flex-wrap:wrap">
-            <button class="btn ok" id="apOkBtn">la sapevo</button>
-            <button class="btn danger" id="apNoBtn">da ripassare</button>
-          </div>
-          <button class="btn secondary small" id="apStopBtn">interrompi</button>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <!-- ==================== STATISTICHE ==================== -->
   <section id="view-stats" class="view">
     <h1>statistiche</h1>
@@ -297,10 +269,14 @@
       <p id="statsOral"></p>
       <p id="statsOpen"></p>
       <div id="statsBox" style="margin-top:1rem"></div>
+      <div id="statsExams" style="margin-top:1rem"></div>
       <div class="quiz-controls">
         <button class="btn" id="statsWrongBtn">ripassa le domande sbagliate</button>
+        <button class="btn secondary small" id="statsExportBtn">esporta progresso</button>
+        <button class="btn secondary small" id="statsImportBtn">importa progresso</button>
         <button class="btn danger small" id="statsResetBtn">azzera statistiche</button>
       </div>
+      <input type="file" id="statsImportFile" accept="application/json" class="hidden">
     </div>
   </section>
 
