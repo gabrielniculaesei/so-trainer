@@ -20,7 +20,7 @@
     const bin = (v, n) => v.toString(2).padStart(n, "0");
 
     window.SIMS.push({
-      id: "sim_mmu", topic: "memoria", name: "Traduzione indirizzi + TLB", icon: "🧭",
+      id: "sim_mmu", topic: "memoria", name: "Traduzione indirizzi + TLB", icon: "MMU",
       title: "Traduzione degli indirizzi: pagine, tabella e TLB",
       desc: "Un indirizzo virtuale alla volta: lo spezzi in numero di pagina e offset, provi il TLB, poi la tabella delle pagine — fino all'indirizzo fisico o al page fault.",
       info: `<p><b>Come leggere la scena.</b> L'indirizzo virtuale a 16 bit è spezzato in due riquadri: <b>p</b> (4 bit, verde) sceglie la riga della tabella, <b>d</b> (12 bit, ambra) è l'offset che passa <i>invariato</i> nell'indirizzo fisico — la MMU traduce solo p in numero di cornice. A sinistra il TLB, a destra la tabella delle pagine col bit di validità.</p>
@@ -34,7 +34,7 @@
         const st = newState();
         let page = 0, off = 0;
         box.innerHTML = `<div class="sim-params">
-            <button class="btn small p-addr">🎲 nuovo indirizzo virtuale</button>
+            <button class="btn small p-addr">nuovo indirizzo virtuale</button>
             <button class="btn small secondary p-flush">svuota TLB</button>
             <span class="badge">pagine da 4 KB · indirizzi virtuali a 16 bit (16 pagine) · 8 cornici</span>
           </div>
@@ -127,7 +127,7 @@
     }
 
     window.SIMS.push({
-      id: "sim_fat", topic: "fs", name: "FAT: catena dei cluster", icon: "🔗",
+      id: "sim_fat", topic: "fs", name: "FAT: catena dei cluster", icon: "FAT",
       title: "FAT: seguire la catena dei cluster di un file",
       desc: "La directory dà solo il primo cluster: il resto del file si ricostruisce saltando di cella in cella dentro la FAT, fino al marcatore di fine file.",
       info: `<p><b>Come leggere la scena.</b> La directory associa a ogni nome solo il <b>primo cluster</b>. La FAT ha una entry per ogni cluster del disco: il valore dice qual è il cluster <i>successivo</i> dello stesso file (o EOF, o libero «·»). L'area dati in basso mostra dove stanno fisicamente i pezzi: nota quanto sono sparpagliati.</p>
@@ -192,7 +192,7 @@
         function drawBar() {
           filesBar.innerHTML = d.files.map((fl, i) =>
             `<button class="btn small ${i === sel ? "" : "secondary"} p-f" data-i="${i}">file ${fl.name} (${fl.chain.length} cluster)</button>`).join("") +
-            `<button class="btn small secondary p-new">🎲 nuovo disco</button>`;
+            `<button class="btn small secondary p-new">nuovo disco</button>`;
         }
         drawBar();
         pl = K.player(q(".sim-player"), { build, render });
@@ -258,7 +258,7 @@
     }
 
     window.SIMS.push({
-      id: "sim_inode", topic: "fs", name: "i-node: diretti e indiretti", icon: "🌳",
+      id: "sim_inode", topic: "fs", name: "i-node: diretti e indiretti", icon: "i-n",
       title: "i-node UNIX: dai byte del file al blocco su disco",
       desc: "Scegli un offset nel file e segui il cammino: puntatori diretti, poi indiretto singolo, doppio, triplo — con i calcoli degli indici e il conto degli accessi a disco.",
       info: `<p><b>Come leggere la scena.</b> A sinistra l'i-node con i suoi 13 puntatori: 10 <b>diretti</b> (blocchi 0–9), poi indiretto <b>singolo</b>, <b>doppio</b> e <b>triplo</b>. Dato l'offset in byte, si calcola il blocco logico b = ⌊offset / 1024⌋ e si decide la zona; il cammino evidenziato mostra i blocchi di puntatori da attraversare per arrivare al blocco dati.</p>
@@ -296,7 +296,7 @@
         const bar = q(".p-btns");
         function drawBar() {
           bar.innerHTML = presets.map((p, i) => `<button class="btn small ${p.off === off ? "" : "secondary"}" data-i="${i}">${p.label}</button>`).join(" ") +
-            ` <button class="btn small secondary" data-i="rnd">🎲 a caso</button>`;
+            ` <button class="btn small secondary" data-i="rnd">a caso</button>`;
         }
         drawBar();
         bar.addEventListener("click", e => {
@@ -323,7 +323,7 @@
     };
 
     window.SIMS.push({
-      id: "sim_prodcons", topic: "sync", name: "Produttore–consumatore", icon: "🔁",
+      id: "sim_prodcons", topic: "sync", name: "Produttore–consumatore", icon: "P/C",
       title: "Produttore–consumatore con semafori (buffer limitato)",
       desc: "Esegui tu, una primitiva alla volta, il codice dei due processi: guarda empty, full e mutex cambiare valore, i processi bloccarsi sulle down e risvegliarsi con le up.",
       info: `<p><b>Come leggere la scena.</b> I due pannelli mostrano il codice dei processi con la prossima primitiva evidenziata (rossa se il processo è bloccato lì sopra). Sotto: i tre semafori con valore e coda di attesa, il buffer circolare con i puntatori in/out e il log delle operazioni.</p>
@@ -345,9 +345,9 @@
         }
         reset();
         box.innerHTML = `<div class="sim-params">
-            <button class="btn small p-prod">▶ passo del produttore</button>
-            <button class="btn small p-cons">▶ passo del consumatore</button>
-            <button class="btn small secondary p-reset">⏮ reset</button>
+            <button class="btn small p-prod">passo del produttore</button>
+            <button class="btn small p-cons">passo del consumatore</button>
+            <button class="btn small secondary p-reset">reset</button>
           </div>
           <div class="sim-stage"></div>
           <p class="sim-hint">Prova a mandare in blocco i processi: consuma a buffer vuoto (il consumatore si blocca su <code>down(full)</code>) o produci fino a riempire i ${N} posti (il produttore si blocca su <code>down(empty)</code>). Nota che una <code>up</code> su un semaforo con coda non incrementa il valore: <i>sveglia</i> direttamente un processo.</p>`;
@@ -440,7 +440,7 @@
     };
 
     window.SIMS.push({
-      id: "sim_pstati", topic: "processi", name: "Stati di un processo", icon: "🚦",
+      id: "sim_pstati", topic: "processi", name: "Stati di un processo", icon: "PS",
       title: "Il ciclo di vita di un processo: pronto, esecuzione, bloccato",
       desc: "Pilota un processo lungo il diagramma degli stati: solo gli eventi leciti sono attivi — scopri perché da «bloccato» non si torna mai direttamente in esecuzione.",
       info: `<p><b>Come leggere la scena.</b> Il diagramma a 5 stati del corso: <b>nuovo → pronto ⇄ esecuzione → terminato</b>, con la deviazione per <b>bloccato</b>. I bottoni sono gli eventi: solo quelli leciti dallo stato corrente sono attivi.</p>
@@ -478,7 +478,7 @@
         function render() {
           q(".p-ev").innerHTML = EVENTS.map(ev =>
             `<button class="btn small ${ev.from === cur ? "" : "secondary"}" data-ev="${ev.id}" ${ev.from === cur ? "" : "disabled"}>${ev.label}</button>`).join("") +
-            ` <button class="btn small secondary" data-ev="_reset">⏮ reset</button>`;
+            ` <button class="btn small secondary" data-ev="_reset">reset</button>`;
           let h = svg();
           h += `<div class="simlog">${hist.length ? hist.map(l => "· " + l).join("<br>") : "· il processo è stato creato: è nello stato <b>nuovo</b>"}</div>`;
           q(".sim-stage").innerHTML = h;
@@ -525,7 +525,7 @@
     const PATHS = ["/usr/ast/mbox", "/home/anna/tesi/cap1.tex", "/var/log/sys.log"];
 
     window.SIMS.push({
-      id: "sim_path", topic: "fs", name: "Risoluzione di un pathname", icon: "📁",
+      id: "sim_path", topic: "fs", name: "Risoluzione di un pathname", icon: "DIR",
       title: "Aprire /usr/ast/mbox: la risoluzione di un pathname in UNIX",
       desc: "Ogni componente del cammino costa due accessi a disco: il blocco dati della directory (per trovare la voce) e l'i-node del figlio. Contali uno per uno.",
       info: `<p><b>Come leggere la scena.</b> Il cammino in alto mostra a che punto siamo; la tabella è il contenuto della directory che stiamo leggendo (nome → numero di i-node, con «.» e «..» come in UNIX); il contatore tiene il conto degli accessi a disco.</p>
@@ -603,7 +603,7 @@
   /* ==================== EAT: Effective Access Time con TLB ==================== */
   (function () {
     window.SIMS.push({
-      id: "sim_eat", topic: "memoria", name: "EAT: il peso del TLB", icon: "⚡",
+      id: "sim_eat", topic: "memoria", name: "EAT: il peso del TLB", icon: "EAT",
       title: "Effective Access Time: quanto fa risparmiare il TLB",
       desc: "Muovi hit ratio e tempi di accesso e guarda l'EAT ricalcolarsi in tempo reale, con i due scenari (hit e miss) disegnati in scala e il confronto col caso senza TLB.",
       info: `<p><b>Come leggere la scena.</b> Le prime due barre sono i due scenari possibili, in scala: con <b>TLB hit</b> paghi TLB + un accesso in RAM (il dato); con <b>TLB miss</b> paghi TLB + <i>due</i> accessi in RAM (prima la tabella delle pagine, poi il dato). L'EAT è la media pesata con l'hit ratio ε — la formula del corso: <b>EAT = ε(t<sub>TLB</sub>+t<sub>RAM</sub>) + (1−ε)(t<sub>TLB</sub>+2t<sub>RAM</sub>)</b>.</p>

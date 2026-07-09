@@ -12,42 +12,68 @@ window.SIMKIT = (function () {
   const registry = [];
   function stopAll() { registry.forEach(f => { try { f(); } catch (e) { } }); registry.length = 0; }
 
-  // controlli passo/indietro/auto: build() ricrea i frame, render(frame) disegna la scena
+  // controlli passo/indietro/auto: build() ricrea i frame, render(frame) disegna la scena.
+  // Testuale (nessuna emoji), con scrubber, velocità e scorciatoie da tastiera.
   function player(host, opts) {
     host.innerHTML = `
       <div class="sim-controls">
-        <button class="btn small secondary sp-reset" title="torna all'inizio">⏮</button>
-        <button class="btn small secondary sp-back" title="un passo indietro">◀</button>
-        <button class="btn small sp-step">passo ▶</button>
-        <button class="btn small secondary sp-play">auto ▶▶</button>
+        <button class="btn small secondary sp-reset" title="torna all'inizio">« inizio</button>
+        <button class="btn small secondary sp-back" title="un passo indietro">‹ indietro</button>
+        <button class="btn small sp-step">passo ›</button>
+        <button class="btn small secondary sp-play">auto</button>
+        <label class="sp-speed-l">velocità
+          <select class="sp-speed">
+            <option value="1700">0.5×</option>
+            <option value="850" selected>1×</option>
+            <option value="420">2×</option>
+          </select></label>
         <span class="badge sp-pos"></span>
       </div>
+      <input type="range" class="sp-scrub" min="0" max="0" value="0" step="1" aria-label="vai al passo">
       <div class="sim-stage"></div>`;
     const q = s => host.querySelector(s);
-    const stage = q(".sim-stage");
-    let frames = [], i = 0, timer = null;
-    function stop() { if (timer) { clearInterval(timer); timer = null; } q(".sp-play").textContent = "auto ▶▶"; }
+    const stage = q(".sim-stage"), scrub = q(".sp-scrub");
+    let frames = [], i = 0, timer = null, ms = 850;
+    function stop() { if (timer) { clearInterval(timer); timer = null; } q(".sp-play").textContent = "auto"; }
     function draw() {
       stage.innerHTML = opts.render(frames[i], i, frames);
+      // breve transizione (rispetta prefers-reduced-motion via CSS)
+      stage.classList.remove("sim-anim"); void stage.offsetWidth; stage.classList.add("sim-anim");
       q(".sp-pos").textContent = `passo ${i + 1} / ${frames.length}`;
       q(".sp-back").disabled = i === 0;
       q(".sp-step").disabled = i >= frames.length - 1;
+      scrub.max = Math.max(0, frames.length - 1);
+      scrub.value = i;
     }
+    function goTo(n) { i = Math.max(0, Math.min(frames.length - 1, n)); draw(); }
     function step() { if (i < frames.length - 1) { i++; draw(); } if (i >= frames.length - 1) stop(); }
     q(".sp-step").addEventListener("click", () => { stop(); step(); });
     q(".sp-back").addEventListener("click", () => { stop(); if (i > 0) { i--; draw(); } });
     q(".sp-reset").addEventListener("click", () => { stop(); i = 0; draw(); });
+    q(".sp-speed").addEventListener("change", e => { ms = +e.target.value; if (timer) { stop(); q(".sp-play").click(); } });
+    scrub.addEventListener("input", () => { stop(); goTo(+scrub.value); });
     q(".sp-play").addEventListener("click", () => {
       if (timer) { stop(); return; }
       if (i >= frames.length - 1) i = 0;
-      timer = setInterval(step, opts.ms || 950);
-      q(".sp-play").textContent = "pausa ⏸";
+      timer = setInterval(step, ms);
+      q(".sp-play").textContent = "pausa";
       draw();
     });
+    // scorciatoie: ← → per i passi, spazio per auto (solo quando questo player è a schermo)
+    function onKey(e) {
+      if (!host.isConnected || host.offsetParent === null) return;
+      const tag = (document.activeElement && document.activeElement.tagName) || "";
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (e.key === "ArrowRight") { stop(); step(); e.preventDefault(); }
+      else if (e.key === "ArrowLeft") { stop(); if (i > 0) { i--; draw(); } e.preventDefault(); }
+      else if (e.key === " ") { q(".sp-play").click(); e.preventDefault(); }
+    }
+    document.addEventListener("keydown", onKey);
+    function cleanup() { stop(); document.removeEventListener("keydown", onKey); }
     function reload() { stop(); frames = opts.build(); i = 0; draw(); }
-    registry.push(stop);
+    registry.push(cleanup);
     reload();
-    return { reload };
+    return { reload, goTo };
   }
 
   const msg = (txt, cls) => `<div class="sim-msg${cls ? " " + cls : ""}">${txt}</div>`;
@@ -127,7 +153,7 @@ window.SIMKIT = (function () {
   }
 
   window.SIMS.push({
-    id: "sim_sched", topic: "sched", name: "Scheduling della CPU", icon: "⏱",
+    id: "sim_sched", topic: "sched", name: "Scheduling della CPU", icon: "CPU",
     title: "Scheduling della CPU: FCFS, SJF, SRTF, Round Robin, priorità",
     desc: "Guarda il diagramma di Gantt costruirsi un'unità di tempo alla volta, con la coda dei pronti, le prelazioni e — alla fine — turnaround e attesa medi. Col confronto vedi tutti gli algoritmi sugli stessi processi.",
     info: `<p><b>Come leggere la scena.</b> Ogni cella del Gantt è un'unità di tempo: il colore dice chi ha la CPU, «—» è CPU inattiva, la barretta verde è l'istante corrente. Sotto trovi la coda dei pronti (nell'ordine in cui lo scheduler la vede) e la tabella con i tempi: <b>turnaround = completamento − arrivo</b>, <b>attesa = turnaround − burst</b>.</p>
@@ -139,7 +165,7 @@ window.SIMKIT = (function () {
         <li><b>Round Robin</b>: equità a fette di tempo. Quanto piccolo → più reattivo ma più context switch (overhead); quanto enorme → degenera in FCFS.</li>
         <li><b>Priorità</b>: vince il numero più basso; anche qui starvation per i processi a bassa priorità (nella realtà si cura con l'<i>aging</i>).</li>
       </ul>
-      <p><b>Trappola d'esame</b>: negli esercizi si chiede quasi sempre attesa e turnaround medi — usa «📊 confronta» per vedere quanto la stessa situazione cambia da un algoritmo all'altro.</p>`,
+      <p><b>Trappola d'esame</b>: negli esercizi si chiede quasi sempre attesa e turnaround medi — usa «confronta» per vedere quanto la stessa situazione cambia da un algoritmo all'altro.</p>`,
     mount(box) {
       let procs = genProcs();
       box.innerHTML = `<div class="sim-params">
@@ -151,8 +177,8 @@ window.SIMKIT = (function () {
             <option value="prio">Priorità (preemptive)</option>
           </select></label>
           <label class="p-qwrap">quanto <select class="p-q"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></label>
-          <button class="btn small secondary p-new">🎲 nuovi processi</button>
-          <button class="btn small secondary p-cmp">📊 confronta</button>
+          <button class="btn small secondary p-new">nuovi processi</button>
+          <button class="btn small secondary p-cmp">confronta</button>
         </div>
         <div class="sim-player"></div>
         <div class="sim-stage sim-compare hidden"></div>
@@ -285,7 +311,7 @@ window.SIMKIT = (function () {
   }
 
   window.SIMS.push({
-    id: "sim_pages", topic: "sostituzione", name: "Sostituzione delle pagine", icon: "📄",
+    id: "sim_pages", topic: "sostituzione", name: "Sostituzione delle pagine", icon: "PG",
     title: "Sostituzione delle pagine: FIFO, LRU, Clock, Ottimo",
     desc: "Una stringa di riferimenti scorre pagina per pagina: vedi hit e page fault, la scelta della vittima e — con Clock — la lancetta e i bit R della seconda chance.",
     info: `<p><b>Come leggere la scena.</b> In alto la stringa dei riferimenti (evidenziato quello corrente), poi le cornici di memoria e la tabella storica come si scrive al compito: una colonna per riferimento, «✗» quando c'è page fault. Con Clock compare anche il quadrante: la lancetta gira sulle cornici e ogni pagina porta il suo bit R.</p>
@@ -307,8 +333,8 @@ window.SIMKIT = (function () {
             <option value="opt">Ottimo (Belady)</option>
           </select></label>
           <label>cornici <select class="p-nf"><option selected>3</option><option>4</option></select></label>
-          <button class="btn small secondary p-new">🎲 nuova stringa</button>
-          <button class="btn small secondary p-cmp">📊 confronta</button>
+          <button class="btn small secondary p-new">nuova stringa</button>
+          <button class="btn small secondary p-cmp">confronta</button>
         </div>
         <div class="sim-player"></div>
         <div class="sim-stage sim-compare hidden"></div>
@@ -441,7 +467,7 @@ window.SIMKIT = (function () {
   }
 
   window.SIMS.push({
-    id: "sim_disk", topic: "dischi", name: "Scheduling del disco", icon: "💿",
+    id: "sim_disk", topic: "dischi", name: "Scheduling del disco", icon: "DSK",
     title: "Scheduling del disco: FCFS, SSTF, SCAN, C-SCAN, LOOK, C-LOOK",
     desc: "La testina si muove richiesta dopo richiesta sul classico diagramma cilindri/tempo: confronta gli spostamenti totali e nota dove LOOK inverte rispetto a SCAN.",
     info: `<p><b>Come leggere la scena.</b> È il diagramma che si disegna al compito: in orizzontale i cilindri (0–199), la linea scende di un livello a ogni movimento della testina. I pallini sull'asse sono le richieste (si riempiono quando vengono servite); i tratti tratteggiati color ambra sono i salti di C-SCAN/C-LOOK, conteggiati a parte.</p>
@@ -466,8 +492,8 @@ window.SIMKIT = (function () {
             <option value="clook">C-LOOK</option>
           </select></label>
           <label class="p-dwrap">direzione <select class="p-dir"><option value="1" selected>verso l'alto</option><option value="0">verso il basso</option></select></label>
-          <button class="btn small secondary p-new">🎲 nuova coda</button>
-          <button class="btn small secondary p-cmp">📊 confronta</button>
+          <button class="btn small secondary p-new">nuova coda</button>
+          <button class="btn small secondary p-cmp">confronta</button>
         </div>
         <div class="sim-player"></div>
         <div class="sim-stage sim-compare hidden"></div>
@@ -607,7 +633,7 @@ window.SIMKIT = (function () {
   }
 
   window.SIMS.push({
-    id: "sim_fit", topic: "memoria", name: "First / best / worst fit", icon: "🧩",
+    id: "sim_fit", topic: "memoria", name: "First / best / worst fit", icon: "FIT",
     title: "Allocazione contigua: first fit, best fit, worst fit, next fit",
     desc: "Una fila di buchi e una coda di richieste: guarda la strategia scandire la memoria, scegliere il buco e lasciare frammentazione esterna diversa a ogni scelta.",
     info: `<p><b>Come leggere la scena.</b> La barra è la memoria: i blocchi pieni sono occupati (SO e processi già presenti), quelli tratteggiati verdi sono i buchi con la loro dimensione. Il buco evidenziato in ambra è quello che la strategia sta esaminando; quando alloca, il nuovo processo appare in verde pieno e l'eventuale resto del buco sopravvive come buco più piccolo.</p>
@@ -628,7 +654,7 @@ window.SIMKIT = (function () {
             <option value="worst">worst fit</option>
             <option value="next">next fit</option>
           </select></label>
-          <button class="btn small secondary p-new">🎲 nuova memoria</button>
+          <button class="btn small secondary p-new">nuova memoria</button>
         </div>
         <div class="sim-player"></div>
         <p class="sim-hint">I buchi (tratteggiati, col numero di unità libere) sono scanditi per indirizzi crescenti; next fit riparte da dove si era fermato. Best fit tende a lasciare briciole inutilizzabili, worst fit distrugge i buchi grandi.</p>`;
@@ -676,7 +702,7 @@ window.SIMKIT = (function () {
   }
 
   window.SIMS.push({
-    id: "sim_raid", topic: "dischi", name: "RAID: parità XOR", icon: "🛡️",
+    id: "sim_raid", topic: "dischi", name: "RAID: parità XOR", icon: "RAID",
     title: "RAID 4/5: parità XOR e ricostruzione di un disco guasto",
     desc: "Rompi un disco e guarda la parità ricostruirlo bit per bit: ogni colonna deve avere un numero pari di 1, quindi il bit perso è lo XOR degli altri.",
     info: `<p><b>Come leggere la scena.</b> Ogni riga è un disco (D1–D3 dati, P parità), ogni colonna un bit della strip. La riga P è calcolata così che ogni colonna abbia un numero <b>pari</b> di 1: P = D1 ⊕ D2 ⊕ D3. Quando un disco muore, i suoi bit diventano «?» e vengono ricalcolati colonna per colonna con lo XOR dei tre superstiti — funziona anche se a morire è proprio P.</p>
@@ -693,7 +719,7 @@ window.SIMKIT = (function () {
           <label>disco guasto <select class="p-fail">
             <option value="0">D1</option><option value="1" selected>D2</option><option value="2">D3</option><option value="3">P (parità)</option>
           </select></label>
-          <button class="btn small secondary p-new">🎲 nuovi dati</button>
+          <button class="btn small secondary p-new">nuovi dati</button>
         </div>
         <div class="sim-player"></div>`;
       const q = s => box.querySelector(s);
