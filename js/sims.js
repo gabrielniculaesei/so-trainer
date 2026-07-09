@@ -439,11 +439,17 @@ window.SIMKIT = (function () {
     return pts;
   }
 
-  function diskSVG(pts, k) {
-    const W = 660, xp = 26, axY = 22;
+  const prefersReduce = () => !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+
+  // k = passo corrente; prevC = cilindro del passo precedente; anim = movimento continuo attivo.
+  // La testina scorre orizzontalmente sull'asse dei cilindri e l'ultimo tratto del percorso
+  // si "disegna" da un passo all'altro (animazioni SMIL: autonome, nessuna dipendenza esterna).
+  function diskSVG(pts, k, prevC, anim) {
+    const W = 660, xp = 26, axY = 22, DUR = "0.4s";
     const dy = Math.min(30, Math.max(15, Math.floor(330 / Math.max(pts.length - 1, 1))));
     const H = axY + 18 + (pts.length - 1) * dy + 14;
     const x = c => xp + (c / MAX) * (W - 2 * xp);
+    const moving = anim && k > 0;
     let s = `<svg class="sim-svg" viewBox="0 0 ${W} ${H}" style="width:${W}px">`;
     s += `<line x1="${xp}" y1="${axY}" x2="${W - xp}" y2="${axY}" style="stroke:var(--border)"/>`;
     [0, 50, 100, 150, 199].forEach(c => {
@@ -454,13 +460,32 @@ window.SIMKIT = (function () {
       const done = i <= k;
       s += `<circle cx="${x(p.c)}" cy="${axY}" r="4" style="fill:${done ? "var(--accent)" : "var(--surface)"};stroke:var(--accent);stroke-width:1.5"/>`;
     });
+    // guida verticale + testina: seguono il cilindro corrente scorrendo dall'ultima posizione
+    const cx = x(pts[k].c), pcx = x(prevC);
+    s += `<g transform="translate(${cx},0)">`;
+    if (moving) s += `<animateTransform attributeName="transform" type="translate" from="${pcx} 0" to="${cx} 0" dur="${DUR}" fill="freeze"/>`;
+    s += `<line x1="0" y1="${axY}" x2="0" y2="${H - 6}" style="stroke:var(--accent);stroke-width:1;stroke-dasharray:3 4;opacity:.3"/>`;
+    s += `<polygon points="0,${axY - 8} -5,${axY - 16} 5,${axY - 16}" style="fill:var(--accent)"/>`;
+    s += `</g>`;
+    // tratti del percorso: gli ultimi disegnati staticamente, l'ultimo si allunga
     for (let i = 1; i <= k; i++) {
       const x1 = x(pts[i - 1].c), y1 = axY + 10 + (i - 1) * dy, x2 = x(pts[i].c), y2 = axY + 10 + i * dy;
-      s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="stroke:${pts[i].jump ? "var(--amber)" : "var(--accent)"};stroke-width:2${pts[i].jump ? ";stroke-dasharray:5 4" : ""}"/>`;
+      const col = pts[i].jump ? "var(--amber)" : "var(--accent)", dash = pts[i].jump ? ";stroke-dasharray:5 4" : "";
+      if (i === k && moving) {
+        s += `<line x1="${x1}" y1="${y1}" x2="${x1}" y2="${y1}" style="stroke:${col};stroke-width:2${dash}"><animate attributeName="x2" from="${x1}" to="${x2}" dur="${DUR}" fill="freeze"/><animate attributeName="y2" from="${y1}" to="${y2}" dur="${DUR}" fill="freeze"/></line>`;
+      } else {
+        s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="stroke:${col};stroke-width:2${dash}"/>`;
+      }
     }
     for (let i = 0; i <= k; i++) {
       const px = x(pts[i].c), py = axY + 10 + i * dy;
-      s += `<circle cx="${px}" cy="${py}" r="${i === k ? 5 : 3.5}" style="fill:${pts[i].req ? "var(--accent)" : "var(--surface2)"};stroke:var(--accent);stroke-width:1.5"/>`;
+      const r = i === k ? 5 : 3.5, fill = pts[i].req ? "var(--accent)" : "var(--surface2)";
+      if (i === k && moving) {
+        const px0 = x(pts[k - 1].c), py0 = axY + 10 + (k - 1) * dy;
+        s += `<circle cx="${px0}" cy="${py0}" r="${r}" style="fill:${fill};stroke:var(--accent);stroke-width:1.5"><animate attributeName="cx" from="${px0}" to="${px}" dur="${DUR}" fill="freeze"/><animate attributeName="cy" from="${py0}" to="${py}" dur="${DUR}" fill="freeze"/></circle>`;
+      } else {
+        s += `<circle cx="${px}" cy="${py}" r="${r}" style="fill:${fill};stroke:var(--accent);stroke-width:1.5"/>`;
+      }
       s += `<text x="${px + 9}" y="${py + 4}" style="fill:var(--dim);font-family:var(--mono);font-size:9.5px">${pts[i].c}</text>`;
     }
     return s + "</svg>";
@@ -521,7 +546,8 @@ window.SIMKIT = (function () {
         }
         let h = K.msg(f.msg);
         h += `<div class="squeue"><span class="badge acc">spostamento: ${move} cilindri</span>${jump ? `<span class="badge">salto: ${jump}</span>` : ""}<span class="badge">servite: ${served} / ${d.queue.length}</span></div>`;
-        return h + diskSVG(pts, f.k);
+        const prevC = f.k > 0 ? pts[f.k - 1].c : pts[0].c;
+        return h + diskSVG(pts, f.k, prevC, !prefersReduce());
       }
       const pl = K.player(q(".sim-player"), { build, render, ms: 800 });
       const cmpBox = q(".sim-compare");
