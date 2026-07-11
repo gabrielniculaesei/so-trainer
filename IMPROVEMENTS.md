@@ -1,164 +1,148 @@
-# Roadmap di miglioramento — SO Trainer
+# Roadmap di miglioramento — SO Trainer (v2)
 
-Idee di miglioramento raccolte mettendosi nei panni di uno studente che usa l'app per preparare l'esame di Sistemi Operativi. Ogni sezione descrive **come funziona oggi** (con riferimenti al codice), **cosa cambiare**, **perché aiuta a studiare** e una stima di sforzo (S = ore, M = 1–2 giorni, L = più giorni).
+Aggiornata l'11 luglio 2026, dopo una nuova review del progetto fatta mettendosi nei panni di uno studente che prepara l'esame. La **prima ondata** della roadmap precedente è stata implementata (commit `60443a7`, `136ba5e`, `e50c9dd`); questa versione registra cosa è stato fatto, i **bug e le finiture emersi rileggendo il codice nuovo**, ciò che resta della vecchia roadmap e alcune proposte nuove. Stime di sforzo: S = ore, M = 1–2 giorni, L = più giorni.
 
-Contenuti attuali: 278 crocette, 65 flashcard da orale, 17 domande aperte, 37 esercizi risolti, 28 generatori, 12 simulazioni interattive. Il progresso vive in `localStorage` sotto la chiave `so_trainer_v1` come contatori `{a, c}` (tentativi/corretti) per domanda.
-
----
-
-## 1. Ripasso intelligente (priorità alta)
-
-### 1.1 "Solo domande sbagliate" basato sugli ultimi tentativi — **M**
-**Oggi.** Il filtro usa il cumulativo `a > c` (`quizPool()`, `js/app.js:90-97`): una domanda sbagliata *una volta* resta nel mazzo delle "sbagliate" per sempre, anche dopo dieci risposte corrette di fila. Il mazzo non si svuota mai e il ripasso degli errori diventa rumoroso proprio sotto esame.
-
-**Proposta.** Salvare per ogni domanda anche gli **ultimi N esiti** (es. gli ultimi 3, come stringa `"010"`) e la **data dell'ultimo tentativo**. Il filtro diventa "sbagliata di recente": esce dal mazzo dopo 2–3 risposte corrette consecutive. Richiede la migrazione dello schema (`so_trainer_v1` → `so_trainer_v2`) preservando i contatori esistenti.
-
-**Impatto.** Il pulsante "ripassa le domande sbagliate" diventa una vera coda di lavoro che si svuota: si vede il progresso, non si rifanno domande già consolidate.
-
-### 1.2 Spaced repetition per le flashcard — **M**
-**Oggi.** L'orale ordina le carte in 3 bucket senza alcuna nozione di tempo (`js/app.js:419-431`): mai viste, viste ma sbagliate, consolidate. Nessuna data, nessun intervallo: una carta "consolidata" un mese fa non torna mai in cima.
-
-**Proposta.** Sistema tipo **Leitner semplificato**: ogni carta ha un livello (1–5) e una data `due`. "La sapevo" sale di livello e raddoppia l'intervallo (1, 3, 7, 14, 30 giorni); "da ripassare" torna al livello 1 con `due` = domani. La sessione pesca prima le carte scadute, poi le nuove. Niente algoritmi complessi (SM-2 completo non serve): bastano livello + data.
-
-**Impatto.** È il modo con la migliore evidenza scientifica per memorizzare teoria da orale: si ripassa quando si sta per dimenticare, non a caso.
-
-### 1.3 "Ripasso del giorno" in home — **S**
-**Oggi.** La home è solo un menu; per decidere cosa fare bisogna già saperlo. I dati per argomento esistono già (`renderStats()`, `js/app.js:600-630`).
-
-**Proposta.** Un blocco in home (anche come output del terminale, es. comando `today`) che propone un mix automatico: le flashcard scadute (dal punto 1.2), le crocette sbagliate di recente (1.1) e 5–10 crocette pescate pesando gli argomenti con la percentuale più bassa.
-
-**Impatto.** Si apre l'app e si inizia a studiare in un click, senza dover pianificare la sessione.
+Contenuti attuali: **278 crocette, 82 flashcard (orale + teoria, mazzo unico), 37 esercizi risolti, 31 generatori, 14 simulazioni interattive**. Progresso in `localStorage` sotto `so_trainer_v2` (`{mcq, oral, exQ, exams, theme}`), sessione attiva sotto `so_trainer_session`. Bias di lunghezza della risposta corretta: 29,5% (sotto la soglia del 40% — sano).
 
 ---
 
-## 2. Revisione errori e storico (priorità alta)
+## 0. Fatto (dalla roadmap v1)
 
-### 2.1 Schermata di revisione a fine quiz ed esame — **M**
-**Oggi.** A fine quiz si vede solo il punteggio e una frase di giudizio (`nextQuizQ()`, `js/app.js:158-167`); a fine esame la correzione è visibile ma sparisce per sempre con "nuova simulazione". Le domande sbagliate — la parte più preziosa della sessione — non sono rivedibili.
+- ✅ **1.1** filtro "solo sbagliate" sull'ultimo esito (`s.last`), schema v2 con migrazione da v1
+- ✅ **1.2** ripetizione dilazionata tipo Leitner sulle flashcard (`box` 1–5 + `due`)
+- ✅ **1.3** "ripasso del giorno" in home + comando `today` nel terminale
+- ✅ **2.1** revisione errori a fine quiz ed esame, con "rifai solo queste"
+- ✅ **2.2** storico esami in `stats` (ultimi 8 in tabella, max 50 salvati)
+- ✅ **2.3** autovalutazione esercizi registrata (`store.exQ`)
+- ✅ **2.4** export/import del progresso in JSON
+- ✅ **2.5** sessione quiz/esame persistita e riprendibile; conferma prima di abbandonare un esame
+- ✅ **3** fusione orale + aperte in un mazzo unico da 82 carte, textarea opzionale
+- ✅ **4.2** narrazione per-passo in tutte le sim (il `msg` di ogni frame è la "voce")
+- ✅ **4.4** controlli testuali senza emoji, velocità 0.5×/1×/2×, scrubber, scorciatoie ←/→/spazio
+- ✅ **5** (parziale) toast e dialoghi al posto di `alert`/`confirm`, tasto 6 nel quiz, chip = `<button>` con `aria-pressed`, `aria-live` su spiegazione e timer, focus ring, nav mobile scrollabile
+- ✅ **6** (parziale) `struttura` e `intro` hanno ora sim (syscall, ciclo fetch–execute) e generatori (Amdahl, overhead interrupt, costo syscall)
+- ✅ **4.1** (parziale) motion continuo **solo nella sim del disco** (testina e tratto che si disegnano, via SMIL, con fallback `prefers-reduced-motion`)
 
-**Proposta.** Alla fine di quiz ed esame, un elenco delle domande sbagliate (testo, risposta data, risposta giusta, spiegazione) con un pulsante "rifai solo queste".
-
-**Impatto.** L'errore appena commesso è il momento di massimo apprendimento: va sfruttato subito, non buttato.
-
-### 2.2 Storico degli esami simulati — **M**
-**Oggi.** L'esame non lascia traccia: nessun punteggio salvato, nessun andamento (`gradeExam()`, `js/app.js:354-387` chiama solo `recordMcq` per le singole crocette).
-
-**Proposta.** Salvare ogni esame consegnato (data, configurazione, punteggio crocette, autovalutazione esercizi, fascia di voto) e mostrare in `stats` una tabella/grafico dell'andamento nel tempo.
-
-**Impatto.** "Sto migliorando? Sono pronto?" oggi non ha risposta; con lo storico sì — è la metrica che conta davvero nelle ultime due settimane prima dell'esame.
-
-### 2.3 Esiti degli esercizi nelle statistiche — **S**
-**Oggi.** Solo le crocette alimentano le statistiche: gli esercizi (risolti, generati, e quelli dell'esame autovalutati) sono invisibili. Metà dello studio non viene misurata.
-
-**Proposta.** Registrare l'autovalutazione degli esercizi (`{a, c}` per id di esercizio/generatore, come già fatto per MCQ) e mostrarla per argomento in `stats`.
-
-### 2.4 Export/import del progresso — **S**
-**Oggi.** Tutto vive in un unico blob `localStorage`, legato a un browser: cambiare dispositivo, usare la modalità in incognito o pulire i dati del sito azzera mesi di statistiche senza preavviso.
-
-**Proposta.** Due pulsanti in `stats`: "esporta progresso" (scarica un file JSON) e "importa progresso" (carica e fonde). Zero backend, coerente con l'app statica.
-
-### 2.5 Sessione in corso che sopravvive al reload — **M**
-**Oggi.** Quiz ed esame vivono solo in memoria: un refresh accidentale, un tab chiuso o anche solo un click sbagliato sulla nav perdono tutto, incluso il timer dell'esame (il deadline è assoluto ma non persistito, `startExam()`, `js/app.js:281-296`).
-
-**Proposta.** Salvare lo stato della sessione attiva (domande estratte, risposte date, deadline) in `localStorage` e proporre "riprendi la sessione interrotta" al ritorno. In più, chiedere conferma prima di abbandonare un esame in corso navigando altrove.
-
-**Impatto.** Un esame simulato dura fino a 90 minuti: perderlo per un refresh è il singolo bug di esperienza più frustrante dell'app.
+Restano aperti: 4.1 sulle altre sim, 4.3 (vedi §1.7), 4.5, parte di 5 e 6 — ripresi sotto con le nuove priorità.
 
 ---
 
-## 3. Unificare "orale" e "aperte" (decisione presa)
+## 1. Bug e finiture emersi dalla review (priorità alta, fare per primi)
 
-**Oggi.** Le due sezioni sono flussi gemelli quasi identici (`js/app.js:410-458` vs `547-594`) su dati con gli stessi campi `{id, topic, q, a}`: 65 carte in `ORALI` e 17 in `APERTE`. Le domande aperte non escono allo scritto, quindi la sezione è di fatto una seconda pila di flashcard da orale con in più una textarea.
+### 1.1 Invio nel quiz rischia di saltare una domanda — **S** (bug)
+Dopo la risposta il focus va su `#quizNextBtn` (`js/app.js:202`) e il listener globale su `keydown` chiama `nextQuizQ()` su Invio (`js/app.js:248`). Ma Invio su un bottone focalizzato genera **anche** il click di default → `nextQuizQ()` può scattare due volte e saltare una domanda senza che lo studente la veda. Fix: `e.preventDefault()` nel ramo Invio del listener (o ignorare Invio quando `document.activeElement` è già il bottone). Verificare a mano nel browser dopo il fix.
 
-**Proposta — M.**
-- Una sola sezione **"orale"** con 82 carte (fusione di `ORALI` + `APERTE`).
-- La textarea per impostare la risposta scritta diventa un'opzione disponibile su tutte le carte (torna utile anche per fissare le idee prima di rispondere a voce).
-- Un solo bucket di statistiche: in fase di migrazione, `store.aperte` viene fuso in `store.oral` (gli id sono già univoci: `or*`, `orb*`, `ap*`).
-- Una sola voce nella nav e nel terminale; la sezione "aperte" sparisce da `index.html`.
+### 1.2 Ripresa del quiz può ricontare la domanda appena risposta — **S** (bug)
+`answerQuiz()` incrementa `score`, registra l'esito e chiama `saveSession()` **con `idx` ancora fermo sulla domanda risposta** (`js/app.js:183-191`). Se lo studente ricarica dopo aver risposto ma prima di "prossima" (caso comune: legge la spiegazione e chiude il tab), al resume la stessa domanda ricompare, e rispondendo di nuovo `recordMcq` e `score` contano doppio. Fix: nello snapshot salvare anche `answered`, e al resume ripartire da `idx+1` se la domanda era già stata risposta.
 
-**Impatto.** Meno duplicazione nel codice (circa 50 righe di flusso duplicato), una sola coda di ripasso teoria invece di due parziali, e la spaced repetition del punto 1.2 lavora su un mazzo unico.
+### 1.3 Un reload durante l'esame perde le risposte scritte — **M**
+La sessione d'esame salva crocette scelte, testi e soluzioni dei generatori, ma **non** ciò che lo studente ha scritto nelle textarea degli esercizi (`saveSession()`, `js/app.js:733-737`). In un compito da 60–90 minuti sono proprio i calcoli scritti la parte costosa da rifare. Fix: salvare `value` delle textarea (con un `input` listener debounced) e ripristinarlo in `resumeExam()`.
 
----
+### 1.4 La risposta selezionata in esame sembra "corretta" — **S**
+Selezionare un'opzione durante l'esame le applica la classe `.correct` (verde, `js/app.js:397`): lo stesso stile del feedback "risposta giusta" usato nel quiz. Lo studente può leggerlo come conferma. Fix: una classe neutra `.selected` (bordo accent, niente verde pieno) per la scelta pre-consegna; `.correct`/`.wrong` solo dopo la correzione.
 
-## 4. Sezione "sim": stile visivo ispirato a 3blue1brown / CoreDumped (priorità alta)
+### 1.5 "flashcard in scadenza" non filtra niente — **S**
+Il bottone del ripasso del giorno apre la sezione orale e basta (`js/app.js:685`): la sessione parte comunque su **tutto** il mazzo (82 carte). Insieme al §2.1: fare in modo che il deep-link avvii direttamente una sessione "solo scadute + nuove".
 
-L'interattività attuale resta intatta — passo-passo, cambio algoritmo e parametri, rigenerazione dei dati, confronto tra varianti sugli stessi input. Il riferimento a 3blue1brown e CoreDumped è di **stile visivo e narrativo**: movimento continuo che mostra *il cambiamento*, spiegazione sincronizzata con quello che si guarda, sobrietà grafica. Il tema terminale del sito resta; le **emoji spariscono dalla UI** delle sim (oggi: "confronta" con l'icona grafico, il dado per rigenerare, le frecce piene nei controlli del player — `SIMKIT.player`, `js/sims.js:16-25`).
+### 1.6 Auto-focus del terminale fastidioso su mobile — **S**
+`focusTerm()` all'avvio e a ogni ritorno in home (`js/app.js:87,869`) su Android può aprire la tastiera virtuale appena caricata la pagina. Fix: saltare l'auto-focus quando `matchMedia("(pointer: coarse)")`.
 
-### 4.1 Motion continuo tra i passi — **L**
-**Oggi.** Ogni passo ridisegna da zero l'intero SVG (`opts.render(frame)`): lo stato "salta" e l'occhio deve ricostruire cosa è cambiato.
+### 1.7 Palette semantica: codice morto da decidere — **S**
+Le variabili `--sem-active/candidate/victim/hit/miss/wait` (punto 4.3 della v1) sono definite in `css/style.css:26-31` ma **nessuna sim le usa**: gli SVG usano direttamente `--accent`/`--amber`/`--err`, che di fatto *sono* già la semantica condivisa. Decidere: o si adottano le `--sem-*` nelle sim (rinominando i riferimenti, valore puramente documentale), o si eliminano. Consiglio: eliminarle e documentare la convenzione accent=attivo/hit, ambra=candidato/salto, rosso=vittima/miss in un commento in cima a `sims.js`.
 
-**Proposta.** Interpolare tra uno stato e il successivo con transizioni CSS/SVG o `requestAnimationFrame`: la testina del disco che *si sposta* verso il cilindro scelto, la pagina vittima che *esce* dal frame mentre la nuova *entra*, la lancetta del Clock che *ruota* fino alla pagina candidata, i token del produttore-consumatore che *scorrono* nel buffer. Elementi persistenti con chiave stabile (diff del frame) invece di full re-render. Rispettare `prefers-reduced-motion` tornando al comportamento a scatti.
-
-**Impatto.** Il movimento è l'informazione: vedere la testina percorrere 80 cilindri per FCFS e 12 per SSTF *insegna* la differenza prima ancora di leggere i numeri. È esattamente il motivo per cui i video di 3b1b funzionano.
-
-### 4.2 Narrazione sincronizzata per passo — **M**
-**Oggi.** Il player mostra lo stato e il numero del passo; la spiegazione (`info`) è un testo statico in fondo alla pagina, scollegato da ciò che sta succedendo.
-
-**Proposta.** Un pannello di narrazione accanto alla scena che a ogni passo dice **cosa sta succedendo e perché**, con i numeri del passo corrente: "SSTF sceglie il cilindro 37: è la richiesta più vicina alla testina (|53 − 37| = 16, contro 45 per la 98)". Ogni frame del builder produce anche la sua frase di spiegazione. È il cuore dello stile CoreDumped: la voce che accompagna l'animazione.
-
-**Impatto.** La sim smette di essere "guarda l'algoritmo andare" e diventa "capisci ogni singola decisione" — che è ciò che l'esame chiede di saper riprodurre su carta.
-
-### 4.3 Semantica dei colori unificata — **S**
-**Oggi.** Ogni sim sceglie i propri colori; hit/miss, elemento attivo e vittima non sono coerenti tra le 12 simulazioni.
-
-**Proposta.** Una piccola palette semantica condivisa (variabili CSS): *attivo/in servizio*, *candidato*, *vittima/espulso*, *hit/successo*, *miss/errore*, *in attesa*. Evidenziare a ogni passo solo ciò che è cambiato (flash breve sull'elemento toccato), lasciando il resto in tono neutro.
-
-**Impatto.** Dopo la prima sim, tutte le altre si leggono a colpo d'occhio; meno carico cognitivo, più attenzione all'algoritmo.
-
-### 4.4 Controlli sobri e scrubber — **S**
-**Oggi.** Controlli con simboli pieni ed emoji (frecce, dado, icona grafico), avanzamento solo sequenziale, velocità fissa (950 ms, `js/sims.js:33`).
-
-**Proposta.** Controlli testuali in stile terminale (`reset`, `indietro`, `passo`, `auto`, `velocità 0.5x/1x/2x`), una **timeline/scrubber** per saltare a un passo qualsiasi, e scorciatoie tastiera (frecce = passo avanti/indietro, spazio = auto). Il confronto tra varianti resta, con etichetta testuale "confronta".
-
-### 4.5 Approfondimenti ricchi sotto ogni sim — **M**
-**Oggi.** Il campo `info` è una guida breve su cosa si sta guardando.
-
-**Proposta.** Estendere l'approfondimento di ogni sim con: quando l'algoritmo si comporta male (casi patologici generabili con un click: "mostrami la sequenza che manda in crisi FIFO / l'anomalia di Belady"), confronto ragionato tra varianti (non solo la tabella dei numeri, ma *perché* SSTF può affamare le richieste ai bordi), e collegamenti alle crocette e agli esercizi dello stesso argomento ("ora mettiti alla prova": link a quiz filtrato e generatore correlato).
-
-**Impatto.** Chiude il cerchio guardare → capire → esercitarsi senza uscire dalla pagina.
+### 1.8 Piccolezze — **S**
+- Icona tile `CPU` duplicata tra "Scheduling della CPU" e "Ciclo fetch–decode–execute" (`js/sims3.js:174`): rinominare la seconda (es. `F-E`).
+- "azzera statistiche" non cancella l'eventuale sessione salvata (`js/app.js:848-854`): aggiungere `clearSession()`.
+- Le scorciatoie del quiz reagiscono anche al tasto `n` ma non è documentato da nessuna parte: aggiungere un hint `1–6 rispondi · Invio prossima` sotto le opzioni.
 
 ---
 
-## 5. Fluidità e UX (priorità media)
+## 2. Ripasso: rifiniture sul lavoro fatto (priorità alta)
 
-- **Niente più `alert()`/`confirm()` bloccanti** — **S**. Fine ripasso orale, azzeramento statistiche e consegna esame usano dialoghi nativi del browser (`js/app.js:452, 351, 633`); sostituirli con dialoghi/toast in-page coerenti col tema.
-- **Scorciatoie tastiera complete** — **S**. Oggi solo 1–5 nel quiz (con opzioni fino a 6, `js/app.js:172-180`). Aggiungere il tasto 6, spazio/enter per girare e valutare le flashcard, scorciatoie anche in esame.
-- **Accessibilità** — **M**. Le chips dei filtri sono `<div>` cliccabili non raggiungibili da tastiera (`js/app.js:64-66`): renderle `<button>` con `aria-pressed`. Aggiungere `aria-live` per il feedback giusto/sbagliato e per il timer d'esame, e un focus ring visibile su tutti i controlli.
-- **Mobile** — **S**. Un solo breakpoint a 640px (`css/style.css:410-414`); la nav con 8 voci va a capo in modo disordinato sugli schermi stretti e i target touch delle sim sono piccoli. Rivedere la nav (scroll orizzontale o menu compatto) e ingrandire i controlli touch.
-- **Micro-transizioni tra viste** — **S**. Un fade breve al cambio sezione, coerente con il lavoro sul motion del punto 4 (e anch'esso sotto `prefers-reduced-motion`).
+### 2.1 Sessione orale a taglio fisso e modalità "solo scadute" — **S/M**
+**Oggi.** "Inizia il ripasso" carica sempre l'intero pool ordinato per priorità: 82 carte sono una sessione da un'ora, e non si può dire "fammi fare solo le scadute". L'ordinamento c'è già (`cardWeight()`, `js/app.js:514-519`); manca il taglio.
+
+**Proposta.** Un selettore di sessione (10 / 20 / tutte) e un toggle "solo scadute e nuove". Con il mazzo che scade a blocchi, la sessione tipo diventa 10–15 minuti — la dose che uno studente fa davvero tutti i giorni. Collegare qui il bottone del ripasso del giorno (§1.5).
+
+### 2.2 "Sbagliate di recente" più robusto — **S** (decidere se serve)
+La v1 proponeva l'uscita dal mazzo dopo **2–3 corrette consecutive**; l'implementazione usa il solo ultimo esito (`s.last`, un singolo bit): una risposta corretta *fortunata* toglie subito la domanda dal mazzo. Se all'uso reale il mazzo si svuota troppo in fretta, salvare gli ultimi 3 esiti come stringa (`"010"`) e filtrare su "almeno un errore negli ultimi 2". Lo schema v2 lo permette senza migrazione (basta aggiungere un campo). Da valutare **dopo** un po' d'uso, non subito.
+
+### 2.3 Grafico dell'andamento esami — **S**
+Lo storico c'è ma è solo una tabella (`renderExamHistory()`, `js/app.js:837-847`). Con 5+ esami salvati, una sparkline SVG inline (stessa tecnica delle sim, zero dipendenze) del `pct` nel tempo risponde a colpo d'occhio alla domanda che conta: "sto migliorando?".
 
 ---
 
-## 6. Lacune di contenuto (backlog)
+## 3. Sezione sim: completare il lavoro iniziato (priorità media-alta)
 
-Copertura per argomento (conteggi attuali):
+### 3.1 Estendere il motion continuo alle altre sim — **L**
+Il pattern SMIL della sim del disco (`diskSVG()`, `js/sims.js:447-492`: elemento che scorre + tratto che si disegna, `prefers-reduced-motion` rispettato) funziona ed è autonomo. Portarlo, in ordine di resa didattica:
+1. **Clock** (`sim_pages`): la lancetta che *ruota* fino alla vittima è l'animazione più parlante di tutte;
+2. **Gantt CPU** (`sim_sched`): la cella corrente che si estende invece di apparire;
+3. **produttore–consumatore**: i token che scorrono nel buffer.
+Le sim a stato semplice (RAID, fit, FAT, i-node, pathname) rendono già bene col flash del passo: non toccarle.
 
-| argomento | crocette | orale | esercizi | aperte | generatori | sim |
-|---|---:|---:|---:|---:|---:|---:|
-| intro | 22 | 6 | 1 | 2 | 1 | 0 |
-| struttura | 15 | 3 | 0 | 0 | 0 | 0 |
-| processi | 31 | 7 | 1 | 1 | 1 | 1 |
-| sync | 45 | 14 | 3 | 6 | 2 | 1 |
-| sched | 34 | 7 | 2 | 2 | 3 | 1 |
-| memoria | 38 | 10 | 11 | 1 | 8 | 3 |
-| sostituzione | 34 | 7 | 4 | 3 | 5 | 1 |
-| fs | 32 | 10 | 10 | 1 | 5 | 3 |
-| dischi | 27 | 6 | 5 | 1 | 3 | 2 |
+### 3.2 Approfondimenti "casi patologici" + link incrociati (era 4.5) — **M**
+Sotto ogni sim, oltre alla guida: un bottone "caso patologico" che carica dati precotti (la stringa che mostra l'**anomalia di Belady** su FIFO, la coda che affama SSTF, il quanto RR che degenera in FCFS) e, in fondo, "ora mettiti alla prova" con link che aprono quiz/generatori già filtrati sull'argomento. Chiude il cerchio *guardare → capire → esercitarsi*. Richiede solo di passare un topic preselezionato a `show()` — le chips esistono già.
 
-- **`struttura`** è il buco più grande: 15 crocette e 3 flashcard, ma zero esercizi, generatori e sim. Idee: sim sul percorso di una syscall (user mode → trap → kernel → ritorno), flashcard su microkernel vs monolitico vs modulare, domande su macchine virtuali.
-- **`intro`** non ha nessuna simulazione: una sim su interrupt e ciclo fetch-execute coprirebbe il vuoto.
-- **`processi`** è sottile sul lato pratica (1 generatore, 1 sim su 31 crocette): un generatore su gerarchie di processi/PCB e una sim sul context switch aiuterebbero.
+---
+
+## 4. Proposte nuove
+
+### 4.1 PWA: installabile e offline — **M** (alto valore per lo studente)
+L'app è statica e senza dipendenze: perfetta per un service worker cache-first. Lo studente studia in treno/metro e sul telefono; oggi senza rete l'app non si apre nemmeno, e il progresso è già tutto in `localStorage` quindi funzionerebbe identica offline. Servono: `manifest.json` (nome, icone dal logo esistente, `display: standalone`), `apple-touch-icon`, e un `sw.js` che precache la decina di file con una versione da bumpare a ogni deploy. Su Vercel non serve configurazione: basta servire i file (attenzione solo a non cacheare `sw.js` stesso in modo aggressivo — Vercel di default serve gli statici con revalidation, va bene così).
+
+### 4.2 Script di validazione dei contenuti nel repo — **S**
+Il controllo del bias di lunghezza oggi vive solo come "pattern nella git history". Committare `scripts/validate.js` (Node puro, si carica i `data/*.js` con `eval` come fa il browser) che verifichi: id univoci, `correct` nell'intervallo, 3–5 opzioni, bias di lunghezza < 40% (oggi: 29,5%), topic validi, e che ogni generatore `gen()` produca `{text, sol}` senza lanciare eccezioni su 100 run. Da lanciare a mano prima di ogni commit di contenuti — è il "test suite" naturale di questo progetto, e blocca la classe di errori più probabile (refusi negli indici delle risposte).
+
+### 4.3 Esame configurabile per argomento — **S**
+La simulazione d'esame pesca da tutto il programma (`startExam()`, `js/app.js:350-358`). Sotto data d'esame va bene, ma a metà preparazione serve il compito mirato ("solo memoria + sostituzione"). Riusare `buildChips` nel setup dell'esame e filtrare `MCQ`/`GENERATORS` prima dell'estrazione. Nota nello storico: salvare anche i topic scelti.
+
+### 4.4 Scorciatoie tastiera per le flashcard — **S** (residuo della v1)
+Unico pezzo del punto 5 v1 non fatto: nell'orale, spazio/Invio per "mostra la risposta", `1`/`2` (o `s`/`n`) per "la sapevo"/"da ripassare". Stesso pattern del listener quiz, con la guardia sulla textarea attiva (come già fa il player delle sim, `js/sims.js:63-70`).
+
+### 4.5 Data dell'esame e conto alla rovescia — **S** (opzionale)
+Un campo "data dell'esame" (in `stats` o nel today box): il ripasso del giorno mostra "mancano N giorni" e nelle ultime 2 settimane suggerisce di spostare il mix verso esami simulati completi anziché quiz spot. Costo minimo, dà struttura alla fase finale della preparazione.
+
+---
+
+## 5. Fluidità del codice (manutenzione, priorità bassa)
+
+- `js/app.js` è a 871 righe in un'unica IIFE: ancora leggibile, ma le prossime feature (sessione orale, esame per topic) meritano almeno **sezioni con separatori uniformi** come già fatto per toast/sessione. Non serve spezzare in moduli: senza bundler i file globali sono una scelta, non un debito.
+- Il flusso quiz e il flusso esame duplicano la logica "render opzioni + correzione" (`renderQuizQ`/`answerQuiz` vs `renderExam`/`gradeExam`): se si tocca ancora quella zona, estrarre un helper `renderOptions(q, order, onPick)`. Solo se ci si passa comunque — non è un refactor da fare a freddo.
+- Le tre coppie quasi identiche `p-cmp`/`refreshCmp` in `sims.js` potrebbero entrare in `SIMKIT`, ma sono 6 righe l'una: va bene così.
+- Nessun problema di performance: ~8.600 righe JS totali servite statiche da Vercel con HTTP/2, first load sotto i 100 KB gzip. Analytics e Speed Insights già installati — controllare lì se emergono regressioni reali prima di ottimizzare alcunché.
+
+---
+
+## 6. Lacune di contenuto (backlog, aggiornato)
+
+| argomento | crocette | flashcard | esercizi | generatori | sim |
+|---|---:|---:|---:|---:|---:|
+| intro | 22 | 8 | 1 | 3 | 1 |
+| struttura | 15 | 3 | 0 | 1 | 1 |
+| processi | 31 | 8 | 1 | 1 | 1 |
+| sync | 45 | 20 | 3 | 2 | 1 |
+| sched | 34 | 9 | 2 | 3 | 1 |
+| memoria | 38 | 11 | 11 | 8 | 3 |
+| sostituzione | 34 | 10 | 4 | 5 | 1 |
+| fs | 32 | 6 | 10 | 5 | 3 |
+| dischi | 27 | 7 | 5 | 3 | 2 |
+
+- **`struttura`** resta il buco principale: 15 crocette, 3 flashcard, zero esercizi risolti. Dopo sim e generatore della prima ondata, mancano flashcard (microkernel vs monolitico vs modulare, macchine virtuali, interprete vs compilatore di syscall) e 5–10 crocette.
+- **`sync`** ha 45 crocette ma un solo esercizio-tipo interattivo: un secondo generatore (es. valori di semafori dopo una sequenza di `down`/`up`, in nomenclatura del corso) coprirebbe la domanda d'esame più frequente dell'argomento.
+- **`processi`**: ancora sottile sul lato pratica (1 esercizio, 1 generatore): un generatore su gerarchie `fork()`/albero dei processi sarebbe il complemento naturale della sim sugli stati.
+
+Quando si aggiungono crocette: rilanciare la validazione del §4.2 (bias di lunghezza oggi al 29,5%, non superare il 40%; niente provenienze nei titoli salvo "(classico Tanenbaum)").
 
 ---
 
 ## Ordine di implementazione suggerito
 
-1. **2.5 + 2.1** — sessione persistente e revisione errori: massimo impatto immediato, nessuna migrazione dati complicata.
-2. **1.1 + migrazione schema v2** — il nuovo schema (ultimi esiti + date) è il prerequisito di tutto il ripasso intelligente.
-3. **3** — fusione orale + aperte, così la spaced repetition nasce già sul mazzo unificato.
-4. **1.2 + 1.3** — Leitner e ripasso del giorno.
-5. **2.2 + 2.3 + 2.4** — storico esami, esiti esercizi, export/import.
-6. **4.3 + 4.4 + 4.2** — palette semantica, controlli e scrubber, narrazione per passo (dal più economico al più ricco).
-7. **4.1 + 4.5** — motion continuo e approfondimenti: il lavoro più lungo, da fare sim per sim partendo da disco, sostituzione pagine e scheduling CPU (le più usate all'esame).
-8. **5** — rifiniture UX in parallelo alle altre voci.
-9. **6** — contenuti nuovi, quando il resto è stabile.
+1. **§1 (bug e finiture)** — tutti S tranne 1.3: una sessione di lavoro, e il livello di fiducia nell'app sale subito (specie 1.1–1.3 che toccano dati e sessioni).
+2. **§2.1 + §4.4** — sessione orale a taglio fisso + tasti flashcard: rendono quotidiano l'uso del ripasso dilazionato appena costruito.
+3. **§4.2** — script di validazione, prima della prossima ondata di contenuti.
+4. **§4.1** — PWA/offline: alto valore, indipendente da tutto il resto.
+5. **§4.3 + §2.3** — esame per argomento e sparkline dello storico.
+6. **§3.1 + §3.2** — motion sulle sim (Clock per primo) e casi patologici con link incrociati.
+7. **§6** — contenuti (`struttura` in testa), con validazione attiva.
+8. **§2.2 e §4.5** — solo se l'uso reale ne mostra il bisogno.
