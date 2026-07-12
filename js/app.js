@@ -92,8 +92,9 @@
 
   const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[a[i], a[j]] = [a[j], a[i]]; } return a; };
 
-  // chip per filtrare per argomento (bottoni accessibili da tastiera)
-  function buildChips(containerId, onChange) {
+  // chip per filtrare per argomento (bottoni accessibili da tastiera).
+  // Con macro=true i chip sono i 4 macro-argomenti (window.MACRO) invece dei 9 topic.
+  function buildChips(containerId, onChange, macro) {
     const cont = $(containerId);
     cont.innerHTML = "";
     const mkChip = (label, topic, on) => {
@@ -106,7 +107,10 @@
     };
     const all = mkChip("Tutti", "*", true);
     cont.appendChild(all);
-    Object.entries(window.TOPICS).forEach(([k, label]) => cont.appendChild(mkChip(label, k, false)));
+    const entries = macro
+      ? Object.entries(window.MACRO).map(([k, v]) => [k, v.label])
+      : Object.entries(window.TOPICS);
+    entries.forEach(([k, label]) => cont.appendChild(mkChip(label, k, false)));
     const syncAria = () => $$(containerId + " .chip").forEach(c => c.setAttribute("aria-pressed", c.classList.contains("on") ? "true" : "false"));
     cont.addEventListener("click", e => {
       const chip = e.target.closest(".chip"); if (!chip) return;
@@ -125,7 +129,13 @@
   function selectedTopics(containerId) {
     const on = $$(containerId + " .chip.on").map(c => c.dataset.topic);
     if (on.includes("*") || !on.length) return null; // tutti
-    return new Set(on);
+    // espande gli eventuali macro-argomenti nei topic di dettaglio che contengono
+    const set = new Set();
+    on.forEach(t => {
+      if (window.MACRO && window.MACRO[t]) window.MACRO[t].topics.forEach(x => set.add(x));
+      else set.add(t);
+    });
+    return set;
   }
 
   // Quiz a risposta multipla
@@ -140,12 +150,39 @@
     }
     return pool;
   }
-  function updateQuizCount() {
-    const n = quizPool().length;
-    $("#quizCount").textContent = n + " domande disponibili";
-    $("#quizStartBtn").disabled = n === 0;
+  // scelta di quante domande fare (0 = tutte quelle disponibili)
+  let quizWanted = 20;
+  (function buildQtyChips() {
+    const cont = $("#quizQty");
+    [["10", 10], ["20", 20], ["30", 30], ["50", 50], ["tutte", 0]].forEach(([label, n]) => {
+      const c = document.createElement("button");
+      c.type = "button";
+      c.className = "chip" + (n === quizWanted ? " on" : "");
+      c.textContent = label; c.dataset.n = n;
+      c.setAttribute("aria-pressed", n === quizWanted ? "true" : "false");
+      cont.appendChild(c);
+    });
+    cont.addEventListener("click", e => {
+      const chip = e.target.closest(".chip"); if (!chip) return;
+      $$("#quizQty .chip").forEach(c => { c.classList.remove("on"); c.setAttribute("aria-pressed", "false"); });
+      chip.classList.add("on"); chip.setAttribute("aria-pressed", "true");
+      quizWanted = +chip.dataset.n;
+      updateQuizCount();
+    });
+  })();
+  function quizTake() {
+    const avail = quizPool().length;
+    return quizWanted === 0 ? avail : Math.min(quizWanted, avail);
   }
-  buildChips("#quizChips", updateQuizCount);
+  function updateQuizCount() {
+    const avail = quizPool().length;
+    const take = quizTake();
+    $("#quizCount").textContent = avail === 0
+      ? "nessuna domanda disponibile"
+      : `${take} domande su ${avail} disponibili`;
+    $("#quizStartBtn").disabled = avail === 0;
+  }
+  buildChips("#quizChips", updateQuizCount, true);
   $("#quizOnlyWrong").addEventListener("change", updateQuizCount);
 
   function startQuiz(pool) {
@@ -157,7 +194,7 @@
     renderQuizQ();
     saveSession();
   }
-  $("#quizStartBtn").addEventListener("click", () => startQuiz(shuffle(quizPool())));
+  $("#quizStartBtn").addEventListener("click", () => startQuiz(shuffle(quizPool()).slice(0, quizTake())));
 
   function renderQuizQ() {
     const q = quiz.pool[quiz.idx];

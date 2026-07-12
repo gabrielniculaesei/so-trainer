@@ -113,7 +113,11 @@
     <div id="quizSetup">
       <div class="chips" id="quizChips"></div>
       <div class="card">
-        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+        <div class="qty-row">
+          <span class="qty-label">quante domande:</span>
+          <div class="chips" id="quizQty" role="group" aria-label="numero di domande"></div>
+        </div>
+        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;margin-top:.75rem">
           <input type="checkbox" id="quizOnlyWrong"> solo le domande che ho sbagliato in passato
         </label>
         <div class="quiz-controls">
@@ -298,6 +302,7 @@
 <script src="data/data_mcq_5.js"></script>
 <script src="data/data_mcq_6.js"></script>
 <script src="data/data_mcq_7.js"></script>
+<script src="data/data_mcq_8.js"></script>
 <script src="data/data_other.js"></script>
 <script src="data/data_other2.js"></script>
 <script src="data/data_extra.js"></script>

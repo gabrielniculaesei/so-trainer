@@ -186,6 +186,11 @@ p.lead { color: var(--dim); margin-bottom: 1.1rem; font-size: .95rem; max-width:
 .chip.on::before { content: "[x] "; color: var(--accent); }
 .chip:hover { border-color: var(--accent); }
 
+/* riga "quante domande" nel setup del quiz */
+.qty-row { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
+.qty-label { font-family: var(--mono); font-size: .8rem; color: var(--dim); }
+.qty-row .chips { margin: 0; }
+
 /* quiz */
 .qmeta { display: flex; gap: .45rem; align-items: center; flex-wrap: wrap; margin-bottom: .7rem; }
 .badge {

@@ -11,6 +11,15 @@ window.TOPICS = {
   dischi:       "Dischi, RAID e SSD"
 };
 
+// Macro-argomenti (raggruppano i 9 topic di dettaglio): usati per filtrare il quiz
+// in modo più grezzo. Ogni voce elenca i topic che vi rientrano.
+window.MACRO = {
+  m_intro: { label: "1 · Introduzione",           topics: ["intro", "struttura"] },
+  m_proc:  { label: "2 · Processi e scheduling",   topics: ["processi", "sync", "sched"] },
+  m_mem:   { label: "3 · Gestione memoria",        topics: ["memoria", "sostituzione"] },
+  m_fs:    { label: "4 · File system e dischi",    topics: ["fs", "dischi"] }
+};
+
 window.MCQ = [
 { id: "in01", topic: "intro",
   q: "Quale tra le seguenti <b>NON</b> è un'operazione tipicamente svolta dal sistema operativo?",
