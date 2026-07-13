@@ -333,3 +333,121 @@ Media = (0 + 100 + 130 + 210 + 210) / 5 = 650 / 5 = <b>130 ms</b>.</li>
 </ol>
 <p><b>Attenzione</b>: SCAN (a differenza di LOOK) arriva sempre all'estremo fisico del disco (qui 100) prima di invertire. Traccia SEMPRE la posizione della testina all'istante di ogni arrivo: se la richiesta è già stata oltrepassata nel verso corrente, verrà servita solo al ritorno.</p>` }
 );
+
+// Esercizi in stile "esame scritto" (tipologie ricorrenti nei temi d'esame)
+window.ESERCIZI.push(
+
+{ id:"ex221", topic:"memoria", title:"Paginazione: il programma entra nello spazio di indirizzamento?",
+  text:`<p>Un computer assegna a ogni processo <b>65.536 byte</b> di spazio indirizzabile, diviso in pagine da <b>4096 byte</b>. Un programma ha:</p>
+<ul><li>testo (codice): <b>32.768 byte</b></li>
+<li>dati: <b>16.386 byte</b></li>
+<li>stack: <b>15.870 byte</b></li></ul>
+<p>Il programma riesce a stare nello spazio di indirizzamento? E se le pagine fossero da <b>512 byte</b>?</p>
+<p><b>Vincolo</b>: una pagina non può contenere parti di due segmenti diversi (niente stack e codice nella stessa pagina).</p>`,
+  sol:`<p>Il vincolo "niente segmenti misti in una pagina" obbliga ad arrotondare <b>per eccesso, segmento per segmento</b>: ogni segmento spreca l'ultima pagina parziale (frammentazione interna).</p>
+<p><b>Caso 1 — pagine da 4096 byte.</b> Spazio disponibile = 65.536 / 4096 = <b>16 pagine</b>.</p>
+<ul>
+<li>testo: ⌈32.768 / 4096⌉ = 8 pagine (esatte)</li>
+<li>dati: ⌈16.386 / 4096⌉ = ⌈4,0005⌉ = <b>5 pagine</b> (i 2 byte in più costano una pagina intera!)</li>
+<li>stack: ⌈15.870 / 4096⌉ = ⌈3,87⌉ = <b>4 pagine</b></li>
+</ul>
+<p>Totale = 8 + 5 + 4 = <b>17 pagine &gt; 16</b> ⇒ <b>NON entra</b>.</p>
+<p><b>Caso 2 — pagine da 512 byte.</b> Spazio disponibile = 65.536 / 512 = <b>128 pagine</b>.</p>
+<ul>
+<li>testo: ⌈32.768 / 512⌉ = 64 pagine (esatte)</li>
+<li>dati: ⌈16.386 / 512⌉ = ⌈32,004⌉ = <b>33 pagine</b></li>
+<li>stack: ⌈15.870 / 512⌉ = ⌈30,99⌉ = <b>31 pagine</b></li>
+</ul>
+<p>Totale = 64 + 33 + 31 = <b>128 pagine ≤ 128</b> ⇒ <b>entra, esattamente al limite</b>.</p>
+<p><b>Morale</b>: pagine piccole ⇒ meno frammentazione interna (qui lo spreco scende da 4098+2274 byte a 510+386 byte), ma tabella delle pagine più grande. È il trade-off classico sulla dimensione della pagina.</p>` },
+
+{ id:"ex222", topic:"fs", title:"Lista concatenata: quanti blocchi per un file da 40 KB?",
+  text:`<p>Un file system usa l'<b>allocazione a lista concatenata</b>: ogni blocco dati contiene, al suo interno, il <b>numero del blocco successivo</b>. I blocchi sono da <b>4 KB</b> e il numero di blocco è a <b>32 bit</b>.</p>
+<p>Quanti blocchi occorrono per memorizzare un file da <b>40 KB</b>?</p>`,
+  sol:`<p>Il puntatore al blocco successivo <b>sta dentro il blocco</b> e quindi ruba spazio ai dati:</p>
+<ul>
+<li>numero di blocco a 32 bit = <b>4 byte</b>;</li>
+<li>spazio utile per i dati in ogni blocco = 4096 − 4 = <b>4092 byte</b>.</li>
+</ul>
+<p>File = 40 KB = 40 · 1024 = <b>40.960 byte</b>.</p>
+<p>Blocchi = ⌈40.960 / 4092⌉ = ⌈10,009…⌉ = <b>11 blocchi</b>.</p>
+<p>Con 10 blocchi si memorizzano solo 10 · 4092 = 40.920 byte: restano <b>40 byte</b> scoperti, che richiedono un undicesimo blocco (usato quasi per niente).</p>
+<p><b>Trappola</b>: se il puntatore <i>non</i> stesse nel blocco (allocazione a lista concatenata <b>con FAT</b> in memoria, dove i puntatori vivono in una tabella separata), i 4096 byte sarebbero tutti dati e basterebbero 40.960/4096 = <b>10 blocchi</b>. È esattamente il vantaggio della FAT: i blocchi dati restano di dimensione "potenza di 2" e l'accesso diretto non richiede di leggere la catena dal disco.</p>` },
+
+{ id:"ex223", topic:"memoria", title:"Tabella a 2 livelli: voci di 2° livello e fetch per un indirizzo non mappato",
+  text:`<p>Memoria virtuale con <b>tabella delle pagine a 2 livelli</b>. Spazio di indirizzamento virtuale a <b>32 bit</b>, tabella di <b>1° livello con 1024 voci</b>, pagine virtuali da <b>4 KB</b>.</p>
+<p>1) Determinare il numero di voci di <b>ogni tabella di 2° livello</b>.<br>
+2) Indicare il numero di <b>fetch in memoria centrale</b> necessari per stabilire che un dato spiazzamento nello spazio virtuale <b>non è mappato</b> in memoria (ignorando la gestione del page fault).</p>
+<p>Riportare le formule usate.</p>`,
+  sol:`<p><b>1) Voci di 2° livello.</b></p>
+<ul>
+<li>Offset: pagina da 4 KB = 2¹² byte ⇒ <b>12 bit di offset</b>.</li>
+<li>Numero di pagina virtuale = 32 − 12 = <b>20 bit</b>.</li>
+<li>1° livello con 1024 = 2¹⁰ voci ⇒ <b>10 bit</b> per l'indice di 1° livello.</li>
+<li>Restano 20 − 10 = <b>10 bit</b> per l'indice di 2° livello ⇒ ogni tabella di 2° livello ha <b>2¹⁰ = 1024 voci</b>.</li>
+</ul>
+<p><b>Formula</b>: voci<sub>2° liv</sub> = 2^(bit_virtuali − bit_offset − bit_1°liv) = 2^(32 − 12 − 10) = 2¹⁰ = <b>1024</b>.<br>
+Verifica di copertura: 1024 · 1024 · 4 KB = 2²⁰ · 2¹² = 2³² = 4 GB ✓ (tutto lo spazio virtuale).</p>
+<p><b>2) Fetch per scoprire che la pagina non è mappata.</b></p>
+<ul>
+<li>1° fetch: leggo la voce della tabella di 1° livello (indicizzata dai 10 bit alti) ⇒ mi dà l'indirizzo della tabella di 2° livello.</li>
+<li>2° fetch: leggo la voce della tabella di 2° livello ⇒ trovo il <b>bit di presenza a 0</b> ⇒ pagina non mappata.</li>
+</ul>
+<p>⇒ <b>2 fetch</b> (caso generale/peggiore). Formula: n. fetch = n. livelli della tabella = <b>2</b>.</p>
+<p><b>Caso limite</b>: se è già la voce di <i>1° livello</i> a essere invalida (l'intera tabella di 2° livello non esiste), basta <b>1 fetch</b>. Se invece l'indirizzo fosse mappato, servirebbero 3 accessi in tutto (2 per la traduzione + 1 per il dato) — ed è proprio questo il costo che il <b>TLB</b> serve a evitare.</p>` },
+
+{ id:"ex224", topic:"fs", title:"Bitmap dei blocchi liberi: tracciare creazioni e cancellazioni",
+  text:`<p>Un file system tiene traccia dei blocchi liberi con una <b>bitmap</b> (1 = occupato, 0 = libero). Subito dopo la formattazione la bitmap è:</p>
+<p style="font-family:monospace"><b>1000 0000 0000 0000</b> &nbsp; (il blocco 0 è usato dalla directory radice)</p>
+<p>Il sistema alloca sempre i blocchi liberi con <b>indice più piccolo</b>. Riportare lo stato finale della bitmap dopo:</p>
+<ol><li>creazione del file <b>A</b> da 6 blocchi;</li>
+<li>creazione del file <b>B</b> da 5 blocchi;</li>
+<li>cancellazione di <b>A</b>;</li>
+<li>creazione del file <b>C</b> da 8 blocchi;</li>
+<li>cancellazione di <b>B</b>.</li></ol>`,
+  sol:`<p>Blocchi numerati da 0 a 15. Si procede un'operazione alla volta:</p>
+<ol>
+<li><b>Stato iniziale</b>: <code>1000 0000 0000 0000</code> (occupato solo il blocco 0).</li>
+<li><b>Creo A (6 blocchi)</b> ⇒ prendo i più piccoli liberi: <b>1,2,3,4,5,6</b>.<br>
+<code>1111 1110 0000 0000</code></li>
+<li><b>Creo B (5 blocchi)</b> ⇒ i più piccoli liberi ora sono <b>7,8,9,10,11</b>.<br>
+<code>1111 1111 1111 0000</code></li>
+<li><b>Cancello A</b> ⇒ libero 1–6.<br>
+<code>1000 0001 1111 0000</code></li>
+<li><b>Creo C (8 blocchi)</b> ⇒ i liberi più piccoli sono 1,2,3,4,5,6 (solo 6): ne servono altri 2, presi dai successivi liberi, cioè <b>12 e 13</b>. C occupa quindi <b>1,2,3,4,5,6,12,13</b> — è <b>frammentato</b> in due tronconi.<br>
+<code>1111 1111 1111 1100</code></li>
+<li><b>Cancello B</b> ⇒ libero 7–11.<br>
+<b>Stato finale: <code>1111 1110 0000 1100</code></b></li>
+</ol>
+<p>Verifica: occupati = blocco 0 (radice) + gli 8 blocchi di C (1–6, 12, 13) = 9 bit a 1 ✓.</p>
+<p><b>Osservazione</b>: la bitmap gestisce benissimo la <b>frammentazione esterna</b> (C non ha bisogno di blocchi contigui, purché l'allocazione sia indicizzata/concatenata), ma con l'allocazione <b>contigua</b> C non sarebbe stato allocabile: non esisteva alcun buco contiguo da 8 blocchi.</p>` },
+
+{ id:"ex225", topic:"sched", title:"Chi viene schedulato per ultimo?",
+  text:`<p>Cinque processi:</p>
+<table><tr><th>processo</th><td>P1</td><td>P2</td><td>P3</td><td>P4</td><td>P5</td></tr>
+<tr><th>durata</th><td>7</td><td>5</td><td>2</td><td>4</td><td>4</td></tr>
+<tr><th>arrivo</th><td>0</td><td>3</td><td>4</td><td>6</td><td>9</td></tr></table>
+<p>Qual è il processo che sarà schedulato <b>per ultimo</b>?</p>`,
+  sol:`<p>La risposta <b>dipende dall'algoritmo</b>: è proprio questo il punto dell'esercizio. Durata totale = 7+5+2+4+4 = 22.</p>
+<p><b>FCFS</b> — si serve in ordine di arrivo: P1, P2, P3, P4, P5 ⇒ ultimo <b>P5</b> (banale).</p>
+<p><b>SJF non-preemptive</b>:</p>
+<ul>
+<li>t=0: c'è solo P1 ⇒ P1 gira <b>0–7</b> (non c'è prelazione).</li>
+<li>t=7: pronti P2(5), P3(2), P4(4) ⇒ il più corto è P3 ⇒ <b>7–9</b>.</li>
+<li>t=9: pronti P2(5), P4(4), P5(4) ⇒ pari merito P4/P5, vince chi è arrivato prima ⇒ P4 <b>9–13</b>.</li>
+<li>t=13: pronti P2(5), P5(4) ⇒ P5 <b>13–17</b>.</li>
+<li>t=17: resta P2 ⇒ <b>17–22</b>.</li>
+</ul>
+<p>Ordine: P1, P3, P4, P5, P2 ⇒ ultimo <b>P2</b>.</p>
+<p><b>SRTN (SJF con prelazione)</b>:</p>
+<ul>
+<li>t=0: P1 (residuo 7). t=3 arriva P2(5): residuo di P1 = 4 &lt; 5 ⇒ <b>nessuna prelazione</b>.</li>
+<li>t=4 arriva P3(2): residuo di P1 = 3 &gt; 2 ⇒ <b>prelazione</b>, P3 gira 4–6.</li>
+<li>t=6 arriva P4(4). Pronti: P1(res. 3), P2(5), P4(4) ⇒ vince P1 ⇒ 6–9 (finisce).</li>
+<li>t=9 arriva P5(4). Pronti: P2(5), P4(4), P5(4) ⇒ P4 (9–13), poi P5 (13–17), infine P2 (17–22).</li>
+</ul>
+<p>Ordine di completamento: P3, P1, P4, P5, P2 ⇒ ultimo di nuovo <b>P2</b>.</p>
+<p><b>Risposta</b>: con SJF/SRTN l'ultimo è <b>P2</b> (il più lungo tra quelli in attesa quando la CPU si libera); solo con FCFS sarebbe P5.<br>
+<b>Metodo</b>: nei criteri "shortest first" l'ultimo schedulato è quasi sempre il job più lungo tra quelli ancora pendenti — è il meccanismo che genera la possibile <b>starvation</b> dei processi lunghi.</p>` }
+
+);
