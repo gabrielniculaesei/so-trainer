@@ -26,7 +26,7 @@
     if (parent) PARENT[node.id] = parent;
     if (!node.topic && parent) node.topic = parent.topic;
     CHAPTER[node.id] = depth <= 1 ? node.id : CHAPTER[parent.id];
-    node._search = (node.label + " " + strip(node.desc) + " " + strip(node.tip)).toLowerCase();
+    node._search = (node.label + " " + strip(node.desc) + " " + strip(node.tip) + " " + strip(node.code)).toLowerCase();
     (node.children || []).forEach(c => index(c, node, depth + 1));
   }
   index(window.MAPPA, null, 0);
@@ -130,6 +130,7 @@
     const hasKids = kids(n).length;
     b.innerHTML = `<span class="mn-check" aria-hidden="true">✓</span>
       <span class="mn-label">${n.label}</span>
+      ${n.code ? `<span class="mn-code" title="ha il codice">{}</span>` : ""}
       ${hasKids ? `<span class="mn-tog" role="presentation">${isOpen(n) ? "−" : "+" + kids(n).length}</span>` : ""}`;
     b.setAttribute("aria-expanded", hasKids ? String(isOpen(n)) : "");
     return b;
@@ -259,6 +260,7 @@
       <h2 class="mp-title m${chapterIdx(n.id)}">${n.label}</h2>
       ${topic ? `<span class="badge acc">${topic}</span>` : ""}
       <div class="mp-body">${n.desc || "<p class='note'>—</p>"}</div>
+      ${n.code ? `<div class="mp-codewrap"><div class="mp-codeh">${n.codeTitle || "codice"}</div><pre class="mp-code">${n.code}</pre></div>` : ""}
       ${n.tip ? `<div class="mp-tip"><b>all'esame</b> ${n.tip}</div>` : ""}
       ${kids(n).length ? `<div class="mp-kids">${kids(n).map(c => `<button class="mp-kid" data-goto="${c.id}">${c.label}</button>`).join("")}</div>` : ""}
       <div class="mp-actions">

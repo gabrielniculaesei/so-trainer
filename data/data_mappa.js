@@ -85,7 +85,20 @@ window.MAPPA = {
               desc: `<p>La <b>system call</b> è la porta d'ingresso al kernel: il programma mette in un registro il numero della chiamata, esegue una <b>trap</b> (interrupt software), la CPU passa in modalità kernel e salta al gestore, che consulta la tabella delle system call.</p>
                 <ul><li>Al termine si torna in modalità utente con l'istruzione successiva alla trap.</li>
                 <li>Esempi UNIX: <code>fork</code>, <code>exec</code>, <code>open</code>, <code>read</code>, <code>write</code>, <code>waitpid</code>.</li>
-                <li>La chiamata di libreria (es. <code>printf</code>) <i>non</i> è la system call: la incapsula.</li></ul>`,
+                <li>La chiamata di libreria (es. <code>printf</code>) <i>non</i> è la system call: la incapsula.</li></ul>
+                <p>Gli undici passi di <code>read(fd, buffer, nbytes)</code>: (1–3) i parametri vengono messi sullo stack, (4) si chiama la procedura di libreria, (5) essa mette il <b>numero della system call</b> in un registro, (6) esegue la <b>TRAP</b>, (7) il kernel legge il numero e (8) salta al gestore giusto tramite la tabella delle system call, (9) il gestore esegue, (10) si torna alla procedura di libreria, (11) e da lì al programma.</p>`,
+              codeTitle: `read: dalla chiamata C alla trap`,
+              code: `count = read(fd, buffer, nbytes);   <span class="c">// chiamata C</span>
+
+<span class="c">// dentro la procedura di libreria read():</span>
+    push  nbytes
+    push  &amp;buffer
+    push  fd
+    mov   eax, 3        <span class="c">// numero della system call (read)</span>
+    <span class="k">TRAP</span>                <span class="c">// -&gt; modalità kernel</span>
+    <span class="c">// il kernel indicizza la tabella delle system call</span>
+    <span class="c">// con eax, esegue il gestore, poi torna qui</span>
+    ret                 <span class="c">// -&gt; modalità utente</span>`,
               tip: `Trap = interrupt <b>sincrono</b>, provocato dal programma stesso. L'interrupt di I/O è invece asincrono.`
             },
             {
@@ -206,7 +219,22 @@ window.MAPPA = {
               id: "c2-fork", label: "Creazione e terminazione",
               desc: `<p>In UNIX <code>fork</code> crea un figlio <b>clone</b> del padre (stessa immagine, PID diverso; ritorna 0 al figlio e il PID del figlio al padre); poi tipicamente il figlio esegue <code>exec</code> per sostituire la propria immagine con un nuovo programma.</p>
                 <ul><li>Uscita: <code>exit</code> volontaria, oppure errore fatale, oppure uccisione (<code>kill</code>).</li>
-                <li>UNIX organizza i processi in una <b>gerarchia</b> ad albero; Windows no, tutti i processi sono pari.</li></ul>`
+                <li>UNIX organizza i processi in una <b>gerarchia</b> ad albero; Windows no, tutti i processi sono pari.</li></ul>`,
+              codeTitle: `fork + exec: lo schema della shell`,
+              code: `pid = fork();                  <span class="c">// crea un clone del processo</span>
+
+if (pid &lt; 0) {
+    <span class="c">// fork fallita: niente memoria / troppi processi</span>
+} else if (pid == 0) {
+    <span class="c">// FIGLIO (fork ha restituito 0)</span>
+    execve(comando, parametri, ambiente);
+    <span class="c">// se execve riesce, non torna mai:</span>
+    <span class="c">// l'immagine del processo è stata sostituita</span>
+} else {
+    <span class="c">// PADRE (fork ha restituito il PID del figlio)</span>
+    waitpid(pid, &amp;status, 0);  <span class="c">// aspetta che il figlio finisca</span>
+}`,
+              tip: `<code>fork</code> restituisce <b>due volte</b>, con valori diversi: 0 al figlio, il PID del figlio al padre. È così che le due copie, identiche, capiscono chi sono.`
             }
           ]
         },
@@ -271,32 +299,110 @@ window.MAPPA = {
               desc: `<p>Il processo disabilita gli interrupt entrando nella sezione critica e li riabilita uscendo: senza interrupt del clock, nessuna commutazione.</p>
                 <ul><li>È istruzione <b>privilegiata</b>: darla ai processi utente è pericolosissimo (se dimentica di riabilitarli, il sistema è morto).</li>
                 <li>Su <b>multiprocessore</b> non funziona: disabilita gli interrupt di una sola CPU.</li>
-                <li>Resta però una tecnica usata <i>dentro il kernel</i>, per poche istruzioni.</li></ul>`
+                <li>Resta però una tecnica usata <i>dentro il kernel</i>, per poche istruzioni.</li></ul>`,
+              codeTitle: `atomicità per forza bruta`,
+              code: `disable_interrupts();   <span class="c">// niente clock =&gt; niente context switch</span>
+    <span class="c">// ... sezione critica ...</span>
+enable_interrupts();
+
+<span class="c">// Se il processo si dimentica la enable, il sistema è morto.</span>
+<span class="c">// Su multicore gli altri core continuano a girare: inutile.</span>`
             },
             {
               id: "c2-lock-var", label: "Variabile di lock e alternanza stretta",
-              desc: `<p><b>Variabile di lock</b> semplice: si testa se è 0 e la si mette a 1 — ma test e assegnamento non sono atomici, quindi la race condition si sposta solo di un gradino.</p>
-                <p><b>Alternanza stretta</b> (variabile <code>turn</code>): funziona, ma viola la condizione 3 — un processo fuori dalla sezione critica (magari lentissimo o fermo) impedisce all'altro di entrare, perché l'accesso è obbligatoriamente alternato.</p>`
+              desc: `<p><b>Variabile di lock</b> semplice: si testa se è 0 e la si mette a 1 — ma "testa e imposta" <b>non è atomico</b>. Se A legge 0 e viene interrotto <i>un istante prima</i> di scrivere 1, anche B legge 0: entrambi entrano. La race condition si è solo spostata di un gradino.</p>
+                <p><b>Alternanza stretta</b> (variabile <code>turn</code>): funziona davvero, ma viola la <b>condizione 3</b> — l'accesso è obbligatoriamente alternato, quindi un processo fermo <i>fuori</i> dalla sezione critica impedisce all'altro di rientrare. È anche busy waiting puro.</p>`,
+              codeTitle: `alternanza stretta (turn)`,
+              code: `int turn;               <span class="c">// di chi è il turno</span>
+
+void enter_region(int process) {
+    while (turn != process)
+        ;               <span class="c">// attesa attiva: gira a vuoto</span>
+}
+
+void leave_region(int process) {
+    turn = 1 - process; <span class="c">// passa il turno all'altro</span>
+}`,
+              tip: `Il difetto dell'alternanza stretta si racconta così: P0 esce dalla sezione critica, mette <code>turn = 1</code>, e poi va a fare un lungo calcolo. P1 entra, esce, rimette <code>turn = 0</code>… e ora P1 <b>non può rientrare</b> pur essendo la risorsa libera, perché deve aspettare che P0 faccia il suo giro.`
             },
             {
               id: "c2-peterson", label: "Soluzione di Peterson",
-              desc: `<p>Soluzione <b>software</b> corretta per due processi: un array <code>interested[]</code> per dichiarare l'intenzione più la variabile <code>turn</code> per rompere la parità. Chi arriva per secondo cede il turno e aspetta.</p>
-                <ul><li>Soddisfa tutte e quattro le condizioni.</li>
-                <li>Ma è pur sempre <b>attesa attiva</b>: il processo brucia CPU nel ciclo di controllo.</li></ul>`
+              desc: `<p>Soluzione <b>software</b> corretta per due processi (1981): l'array <code>interested[]</code> dichiara l'intenzione, la variabile <code>turn</code> rompe la parità. Il trucco è che chi arriva <b>per secondo</b> sovrascrive <code>turn</code> con il proprio numero e quindi è lui a restare fuori.</p>
+                <ul><li>Soddisfa tutte e quattro le condizioni: niente deadlock, niente starvation, nessuna ipotesi sulle velocità.</li>
+                <li>Ma è pur sempre <b>attesa attiva</b>: il processo brucia CPU nel ciclo.</li>
+                <li>Sulle CPU moderne può fallire a causa dell'<b>esecuzione fuori ordine</b>: senza barriere di memoria, le due scritture possono essere riordinate.</li></ul>`,
+              codeTitle: `Peterson (2 processi)`,
+              code: `#define N 2
+int turn;                 <span class="c">// di chi è il turno</span>
+int interested[N];        <span class="c">// tutti a FALSE all'inizio</span>
+
+void enter_region(int process) {
+    int other = 1 - process;      <span class="c">// l'altro processo</span>
+    interested[process] = TRUE;   <span class="c">// mi dichiaro interessato</span>
+    turn = process;               <span class="c">// ...e cedo il turno</span>
+    while (turn == process &amp;&amp; interested[other] == TRUE)
+        ;                         <span class="c">// attesa attiva</span>
+}
+
+void leave_region(int process) {
+    interested[process] = FALSE;  <span class="c">// esco dalla sezione critica</span>
+}`,
+              tip: `Se l'altro <b>non è interessato</b>, il <code>while</code> non gira nemmeno una volta: si entra subito. È questo che salva la condizione 3, che l'alternanza stretta violava.`
             },
             {
               id: "c2-tsl", label: "TSL / XCHG e busy waiting",
-              desc: `<p>Soluzione <b>hardware</b>: <code>TSL RX, LOCK</code> legge <code>LOCK</code> in un registro e vi scrive 1 in un'unica operazione <b>atomica</b> (il bus di memoria è bloccato per la durata). <code>XCHG</code> scambia atomicamente registro e memoria: stessa idea.</p>
-                <ul><li><code>enter_region</code>: ripeti TSL finché il vecchio valore non è 0.</li>
-                <li><code>leave_region</code>: <code>LOCK = 0</code>.</li>
-                <li>Funziona anche su multiprocessore, ma è <b>spin lock</b>: attesa attiva, CPU sprecata.</li></ul>`,
-              tip: `Il busy waiting può causare il <b>problema dell'inversione di priorità</b>: un processo H ad alta priorità gira a vuoto aspettando un L a bassa priorità che, essendo pronto ma mai schedulato, non potrà mai uscire dalla sezione critica.`
+              desc: `<p>Soluzione <b>hardware</b>. <code>TSL RX, LOCK</code> (Test and Set Lock) fa due cose in <b>un'unica operazione atomica</b>: copia il contenuto di <code>LOCK</code> nel registro <code>RX</code> e scrive 1 in <code>LOCK</code>. Per garantirlo, la CPU <b>blocca il bus di memoria</b> per tutta la durata dell'istruzione, così nessun altro core può toccare quella parola.</p>
+                <p>Il valore <i>vecchio</i> finito nel registro dice com'era il lock: se era 0 l'ho preso io, se era 1 lo teneva qualcun altro (e riscriverci 1 non cambia nulla).</p>
+                <p><code>XCHG</code> (x86) scambia atomicamente registro e memoria: logica identica.</p>
+                <ul><li>Funziona anche su multiprocessore — è il suo vantaggio decisivo su Peterson.</li>
+                <li>Ma è uno <b>spin lock</b>: attesa attiva, CPU sprecata.</li></ul>`,
+              codeTitle: `TSL: enter_region / leave_region`,
+              code: `enter_region:
+    <span class="k">TSL</span> REGISTER, LOCK   <span class="c">// atomico: REGISTER = LOCK; LOCK = 1</span>
+    CMP REGISTER, #0     <span class="c">// il lock era libero?</span>
+    JNE enter_region     <span class="c">// no (era 1): riprova -&gt; busy waiting</span>
+    RET                  <span class="c">// sì (era 0): entra nella sezione critica</span>
+
+leave_region:
+    MOVE LOCK, #0        <span class="c">// libera il lock</span>
+    RET
+
+<span class="c">// x86: la stessa logica con XCHG REGISTER, LOCK</span>
+<span class="c">// (scambia atomicamente registro e memoria)</span>`,
+              tip: `Il busy waiting causa il <b>problema dell'inversione di priorità</b>: H (alta priorità) gira a vuoto aspettando il lock di L (bassa priorità); ma L è solo <i>pronto</i>, e lo scheduler sceglie sempre H — quindi L non uscirà mai dalla sezione critica e H girerà per sempre.`
             },
             {
               id: "c2-sleep", label: "Sleep e wakeup",
-              desc: `<p>Per non sprecare CPU, il processo che non può entrare si <b>blocca</b> (<code>sleep</code>) e verrà risvegliato (<code>wakeup</code>) da chi esce.</p>
-                <p>Difetto: il <b>segnale di wakeup perso</b>. Se il consumatore controlla il buffer, lo trova vuoto, ma viene prelazionato <i>prima</i> di eseguire <code>sleep</code>, il produttore riempie e manda un wakeup a un processo che non sta ancora dormendo: il segnale svanisce e il consumatore dorme per sempre.</p>`,
-              tip: `È esattamente il problema che il <b>semaforo</b> risolve, perché il contatore <i>ricorda</i> i segnali già inviati.`
+              desc: `<p>Per non sprecare CPU, il processo che non può procedere si <b>blocca</b> con <code>sleep()</code> (passa a <i>bloccato</i>) e viene rimesso tra i pronti da <code>wakeup()</code>. Sono system call.</p>
+                <p>Ma da sole non bastano: il <b>segnale di wakeup si perde</b>. Il consumatore legge <code>count == 0</code> e sta per dormire; viene prelazionato <i>prima</i> di eseguire <code>sleep()</code>; il produttore inserisce, porta <code>count</code> a 1 e manda un <code>wakeup</code> a un processo che <b>non sta ancora dormendo</b>. Il segnale svanisce nel nulla, il consumatore poi dorme — e non lo sveglierà più nessuno. A quel punto il buffer si riempie e si addormenta anche il produttore: <b>deadlock</b>.</p>
+                <p>Toppa possibile: un <b>bit di wakeup in sospeso</b> (un "salvadanaio" per un segnale). Regge con due processi, ma non scala: con tre o più servirebbero più bit — e a quel punto tanto vale usare un <b>contatore</b>, cioè un semaforo.</p>`,
+              codeTitle: `produttore–consumatore con sleep/wakeup (rotto!)`,
+              code: `int count = 0;                  <span class="c">// elementi nel buffer</span>
+
+void producer(void) {
+    while (TRUE) {
+        item = produce_item();
+        if (count == N) sleep();     <span class="c">// buffer pieno: dormi</span>
+        insert_item(item);
+        count = count + 1;
+        if (count == 1)              <span class="c">// era vuoto: sveglia l'altro</span>
+            wakeup(consumer);
+    }
+}
+
+void consumer(void) {
+    while (TRUE) {
+        if (count == 0) sleep();     <span class="c">// &lt;-- QUI la corsa critica:</span>
+                                     <span class="c">// se vengo interrotto tra il test</span>
+                                     <span class="c">// e la sleep, perdo il wakeup</span>
+        item = remove_item();
+        count = count - 1;
+        if (count == N - 1)
+            wakeup(producer);
+        consume_item(item);
+    }
+}`,
+              tip: `<code>count</code> è una variabile condivisa non protetta: è lei la sezione critica. Il semaforo risolve perché il contatore <b>ricorda</b> gli <code>up</code> già fatti, mentre un <code>wakeup</code> mandato a chi non dorme è perso per sempre.`
             }
           ]
         },
@@ -309,13 +415,40 @@ window.MAPPA = {
               desc: `<p><b><code>down(S)</code></b>: se <code>S &gt; 0</code> decrementa e prosegue; se <code>S == 0</code> il processo si <b>blocca</b> sulla coda del semaforo (senza attesa attiva).</p>
                 <p><b><code>up(S)</code></b>: incrementa <code>S</code>; se qualcuno è in attesa, ne risveglia uno (che completa il proprio <code>down</code>).</p>
                 <ul><li>Entrambe sono <b>atomiche</b>: indivisibili, tipicamente realizzate nel kernel disabilitando gli interrupt (o con TSL su multiprocessore).</li>
-                <li>Il contatore memorizza i segnali: niente wakeup persi.</li></ul>`,
+                <li>Il contatore memorizza i segnali: niente wakeup persi.</li>
+                <li>Un semaforo inizializzato a <b>1</b> e usato per la mutua esclusione si dice <b>semaforo binario</b>.</li></ul>`,
+              codeTitle: `semantica di down e up`,
+              code: `<span class="k">down</span>(S):              <span class="c">// atomica</span>
+    if (S &gt; 0)
+        S = S - 1;      <span class="c">// consuma un wakeup salvato e prosegui</span>
+    else
+        sleep();        <span class="c">// nessun wakeup: bloccati sulla coda di S</span>
+                        <span class="c">// (il down NON è completato)</span>
+
+<span class="k">up</span>(S):                <span class="c">// atomica</span>
+    S = S + 1;          <span class="c">// salva un wakeup</span>
+    if (qualcuno dorme su S)
+        risveglia_uno();  <span class="c">// completerà il suo down</span>`,
               tip: `Nomenclatura d'esame: sui semafori si dice <b>down/up</b>. <i>wait/signal</i> è riservato alle variabili condizione dei monitor — e la distinzione viene chiesta apposta.`
             },
             {
-              id: "c2-mutex", label: "Mutex",
-              desc: `<p>Semaforo <b>binario</b> (0/1) usato solo per la mutua esclusione: <code>lock</code>/<code>unlock</code> attorno alla sezione critica. Più semplice ed efficiente del semaforo generale, non serve un contatore.</p>
-                <p>Il <b>futex</b> è la versione efficiente di Linux: prova lo spin in spazio utente (caso non conteso: nessuna system call) e ricorre al kernel solo se c'è davvero contesa.</p>`
+              id: "c2-mutex", label: "Mutex e futex",
+              desc: `<p>Il <b>mutex</b> è un semaforo <b>binario</b> semplificato: solo due stati, <i>locked</i> e <i>unlocked</i>, e nessun contatore. Serve unicamente alla mutua esclusione.</p>
+                <p>Essendo così semplice, si può realizzare <b>in spazio utente</b> con TSL/XCHG. La differenza cruciale rispetto a <code>enter_region</code> è <code>thread_yield</code>: se il lock è occupato, il thread <b>cede subito la CPU</b> invece di girare a vuoto.</p>
+                <p>Il <b>futex</b> (Linux) unisce i due mondi: finché non c'è contesa lavora interamente in spazio utente con un'istruzione atomica — <b>zero system call</b>; solo se il lock è davvero conteso chiama il kernel per mettersi in coda. Si paga il kernel unicamente quando serve.</p>`,
+              codeTitle: `mutex_lock: spin che cede la CPU`,
+              code: `mutex_lock:
+    <span class="k">TSL</span> REGISTER, MUTEX  <span class="c">// atomico: copia e metti a 1</span>
+    CMP REGISTER, #0      <span class="c">// era sbloccato?</span>
+    JZE ok                <span class="c">// sì: entra</span>
+    CALL thread_yield     <span class="c">// no: cedi la CPU allo scheduler</span>
+    JMP mutex_lock        <span class="c">// ...e riprova</span>
+ok: RET
+
+mutex_unlock:
+    MOVE MUTEX, #0
+    RET`,
+              tip: `Differenza da ricordare: <code>enter_region</code> (TSL) fa <b>busy waiting</b> e brucia il quanto; <code>mutex_lock</code> chiama <code>thread_yield</code> e lo restituisce. Stesso hardware, politica opposta.`
             },
             {
               id: "c2-prodcons", label: "Produttore–consumatore", sim: "sim_prodcons",
@@ -323,9 +456,36 @@ window.MAPPA = {
                 <ul><li><b><code>full</code></b> = posizioni piene, inizializzato a <b>0</b>;</li>
                 <li><b><code>empty</code></b> = posizioni libere, inizializzato a <b>N</b>;</li>
                 <li><b><code>mutex</code></b> = 1, protegge il buffer.</li></ul>
-                <p>Produttore: <code>down(empty)</code> → <code>down(mutex)</code> → inserisce → <code>up(mutex)</code> → <code>up(full)</code>.<br>
-                Consumatore: <code>down(full)</code> → <code>down(mutex)</code> → preleva → <code>up(mutex)</code> → <code>up(empty)</code>.</p>`,
-              tip: `<b>L'ordine dei down non è scambiabile.</b> Se si fa <code>down(mutex)</code> prima di <code>down(empty)</code>, un produttore può addormentarsi su un buffer pieno <i>tenendo il mutex</i>: il consumatore non può entrare per svuotarlo → <b>deadlock</b>. Gli up, invece, si possono scambiare senza danno.`
+                <p>I due contatori fanno la <b>sincronizzazione</b> (chi deve aspettare, e quanto), il mutex fa la <b>mutua esclusione</b> sul buffer: sono ruoli diversi, e per questo servono tre semafori e non uno.</p>`,
+              codeTitle: `produttore–consumatore con i semafori`,
+              code: `#define N 100          <span class="c">// posti nel buffer</span>
+
+semaphore mutex = 1;    <span class="c">// mutua esclusione sul buffer</span>
+semaphore empty = N;    <span class="c">// posti liberi</span>
+semaphore full  = 0;    <span class="c">// posti pieni</span>
+
+void producer(void) {
+    while (TRUE) {
+        item = produce_item();
+        <span class="k">down</span>(&amp;empty);        <span class="c">// c'è posto? (se no, dormi)</span>
+        <span class="k">down</span>(&amp;mutex);        <span class="c">// entra nella sezione critica</span>
+        insert_item(item);
+        <span class="k">up</span>(&amp;mutex);          <span class="c">// esci</span>
+        <span class="k">up</span>(&amp;full);           <span class="c">// un posto pieno in più</span>
+    }
+}
+
+void consumer(void) {
+    while (TRUE) {
+        <span class="k">down</span>(&amp;full);         <span class="c">// c'è roba? (se no, dormi)</span>
+        <span class="k">down</span>(&amp;mutex);
+        item = remove_item();
+        <span class="k">up</span>(&amp;mutex);
+        <span class="k">up</span>(&amp;empty);          <span class="c">// un posto libero in più</span>
+        consume_item(item);
+    }
+}`,
+              tip: `<b>L'ordine dei down non è scambiabile.</b> Con <code>down(mutex)</code> prima di <code>down(empty)</code>, il produttore che trova il buffer pieno si addormenta <i>tenendosi il mutex</i>: il consumatore si blocca sul <code>down(mutex)</code> e non potrà mai svuotare il buffer → <b>deadlock</b>. Gli <code>up</code>, invece, si possono scambiare senza danno.`
             }
           ]
         },
@@ -340,13 +500,64 @@ window.MAPPA = {
               desc: `<p>La mutua esclusione non basta: serve anche <b>aspettare una condizione</b> (buffer pieno, buffer vuoto). Le variabili condizione hanno due operazioni:</p>
                 <ul><li><b><code>wait(c)</code></b>: il processo si blocca <b>rilasciando il monitor</b>, così un altro può entrare.</li>
                 <li><b><code>signal(c)</code></b>: risveglia un processo in attesa su <code>c</code>. Se non c'è nessuno in attesa, il segnale è <b>perso per sempre</b>.</li></ul>
-                <p>Convenzione di Hoare: chi fa signal esce subito (o cede il monitor al risvegliato), per non avere due processi attivi dentro il monitor.</p>`,
-              tip: `Differenza chiesta spessissimo: la variabile condizione <b>non ha contatore</b>, quindi un <code>signal</code> senza nessuno in attesa si perde; il semaforo invece <b>ricorda</b> l'<code>up</code> nel contatore.`
+                <p>Convenzione di Hoare: chi fa signal esce subito (o cede il monitor al risvegliato), per non avere due processi attivi dentro il monitor.</p>
+                <p>Perché il monitor non soffre del wakeup perso? Perché la mutua esclusione è <b>automatica</b>: mentre un processo sta valutando la condizione e chiamando <code>wait</code>, nessun altro può essere dentro il monitor a fargli il <code>signal</code> addosso.</p>`,
+              codeTitle: `produttore–consumatore con un monitor`,
+              code: `monitor ProducerConsumer
+    condition full, empty;      <span class="c">// variabili condizione</span>
+    integer count = 0;
+
+    procedure insert(item):
+        if (count == N) <span class="k">wait</span>(full);   <span class="c">// pieno: cedi il monitor</span>
+        insert_item(item);
+        count = count + 1;
+        if (count == 1) <span class="k">signal</span>(empty); <span class="c">// era vuoto: sveglia</span>
+
+    procedure remove():
+        if (count == 0) <span class="k">wait</span>(empty);  <span class="c">// vuoto: cedi il monitor</span>
+        item = remove_item();
+        count = count - 1;
+        if (count == N-1) <span class="k">signal</span>(full);
+end monitor
+
+procedure producer():
+    while (true) { item = produce_item(); ProducerConsumer.insert(item); }
+
+procedure consumer():
+    while (true) { item = ProducerConsumer.remove(); consume_item(item); }`,
+              tip: `Differenza chiesta spessissimo: la variabile condizione <b>non ha contatore</b>, quindi un <code>signal</code> senza nessuno in attesa <b>si perde</b>; il semaforo invece <b>ricorda</b> l'<code>up</code> nel contatore. E nota che qui non c'è nessun mutex esplicito: la mutua esclusione la mette il <b>compilatore</b>.`
             },
             {
               id: "c2-messaggi", label: "Scambio di messaggi e barriere",
-              desc: `<p><b>Messaggi</b> (<code>send</code>/<code>receive</code>): niente memoria condivisa, quindi funzionano anche fra macchine diverse. Problemi tipici: messaggi persi (si usano ack e ritrasmissioni), autenticazione, indirizzamento (diretto o tramite <b>mailbox</b>).</p>
-                <p><b>Barriera</b>: sincronizzazione a fasi — nessun processo supera la barriera finché non sono arrivati tutti. Tipica del calcolo parallelo.</p>`
+              desc: `<p><b>Messaggi</b> (<code>send</code>/<code>receive</code>): niente memoria condivisa, quindi funzionano anche fra macchine diverse — è l'unica via nei sistemi distribuiti.</p>
+                <p>Criticità: <b>messaggi persi</b> (si risolve con un <i>ack</i> del destinatario, e quindi con le ritrasmissioni), <b>identificazione</b> del destinatario, <b>autenticazione</b> (parlo davvero col server giusto?).</p>
+                <p>Indirizzamento: <b>diretto</b> (ogni processo ha un indirizzo univoco), tramite <b>mailbox</b> (buffer con N posti: chi manda a una mailbox piena si blocca) oppure <b>rendezvous</b>, senza buffer — chi arriva primo aspetta l'altro.</p>
+                <p><b>Barriera</b>: sincronizzazione a fasi — nessuno supera la barriera finché non sono arrivati tutti. Tipica del calcolo parallelo.</p>`,
+              codeTitle: `produttore–consumatore a messaggi`,
+              code: `#define N 100
+
+void producer(void) {
+    message m;
+    while (TRUE) {
+        item = produce_item();
+        <span class="k">receive</span>(consumer, &amp;m);   <span class="c">// aspetta un messaggio VUOTO</span>
+        build_message(&amp;m, item);
+        <span class="k">send</span>(consumer, &amp;m);      <span class="c">// spediscilo pieno</span>
+    }
+}
+
+void consumer(void) {
+    message m;
+    for (i = 0; i &lt; N; i++)
+        <span class="k">send</span>(producer, &amp;m);      <span class="c">// "credito" iniziale: N vuoti</span>
+    while (TRUE) {
+        <span class="k">receive</span>(producer, &amp;m);
+        item = extract_item(&amp;m);
+        <span class="k">send</span>(producer, &amp;m);      <span class="c">// restituisci il contenitore vuoto</span>
+        consume_item(item);
+    }
+}`,
+              tip: `Gli N messaggi vuoti mandati all'inizio dal consumatore fanno esattamente il lavoro del semaforo <code>empty</code> = N: limitano il produttore a N elementi in volo.`
             }
           ]
         },
@@ -356,19 +567,122 @@ window.MAPPA = {
           children: [
             {
               id: "c2-filosofi", label: "Filosofi a cena",
-              desc: `<p>Cinque filosofi, cinque forchette, ognuno ne serve due. Se tutti prendono la sinistra insieme, nessuno può prendere la destra: <b>deadlock</b>. Se tutti rilasciano e riprovano insieme, girano a vuoto: <b>starvation</b> (livelock).</p>
-                <p>Soluzione corretta: un <b>mutex</b> protegge il controllo dello stato, e ogni filosofo può passare a <i>mangiando</i> solo se <b>nessuno dei due vicini</b> sta mangiando; altrimenti si blocca sul proprio semaforo, e sarà un vicino, finendo di mangiare, a risvegliarlo (<code>test()</code> sui vicini).</p>`,
-              tip: `È l'esempio-tipo per definire <b>deadlock</b> vs <b>starvation</b>: da tenere pronto anche come domanda di teoria pura.`
+              desc: `<p>Cinque filosofi attorno a un tavolo, cinque forchette (una fra due piatti), e per mangiare ne servono <b>due</b>. Modella la contesa di più risorse insieme.</p>
+                <p><b>Tentativo ingenuo</b> (prendi la sinistra, poi la destra): se tutti prendono la sinistra nello stesso istante, nessuno trova la destra e non la rilascia mai → <b>deadlock</b>. Se invece, non trovando la destra, tutti rilasciano e riprovano <i>dopo lo stesso tempo</i>, ripartono in sincrono all'infinito: <b>starvation</b> (livelock) — girano, ma nessuno mangia.</p>
+                <p><b>Soluzione corretta</b>: un <code>mutex</code> protegge il controllo dello stato; un filosofo passa a <i>mangiando</i> solo se <b>nessuno dei due vicini</b> sta mangiando, altrimenti si blocca sul <i>proprio</i> semaforo. Sarà un vicino, posando le forchette, a chiamare <code>test()</code> su di lui e a risvegliarlo.</p>`,
+              codeTitle: `filosofi: ingenuo (deadlock) e corretto`,
+              code: `<span class="c">// --- TENTATIVO INGENUO: va in deadlock ---</span>
+void philosopher(int i) {
+    while (TRUE) {
+        think();
+        take_fork(i);            <span class="c">// sinistra</span>
+        take_fork((i+1) % N);    <span class="c">// destra &lt;- se tutti sono qui: deadlock</span>
+        eat();
+        put_fork(i);
+        put_fork((i+1) % N);
+    }
+}
+
+<span class="c">// --- SOLUZIONE CORRETTA ---</span>
+int state[N];                    <span class="c">// THINKING / HUNGRY / EATING</span>
+semaphore mutex = 1;             <span class="c">// protegge state[]</span>
+semaphore s[N];                  <span class="c">// un semaforo per filosofo, a 0</span>
+
+void take_forks(int i) {
+    <span class="k">down</span>(&amp;mutex);
+    state[i] = HUNGRY;
+    test(i);                     <span class="c">// posso mangiare?</span>
+    <span class="k">up</span>(&amp;mutex);
+    <span class="k">down</span>(&amp;s[i]);              <span class="c">// se test() non è passato, dormi qui</span>
+}
+
+void put_forks(int i) {
+    <span class="k">down</span>(&amp;mutex);
+    state[i] = THINKING;
+    test(LEFT); test(RIGHT);     <span class="c">// sveglia i vicini se ora possono</span>
+    <span class="k">up</span>(&amp;mutex);
+}
+
+void test(int i) {
+    if (state[i] == HUNGRY &amp;&amp;
+        state[LEFT] != EATING &amp;&amp; state[RIGHT] != EATING) {
+        state[i] = EATING;
+        <span class="k">up</span>(&amp;s[i]);            <span class="c">// sblocca il down in take_forks</span>
+    }
+}`,
+              tip: `È l'esempio-tipo per distinguere <b>deadlock</b> (tutti bloccati, nessuno avanza) da <b>starvation</b>/livelock (tutti attivi, ma nessuno progredisce). Nella soluzione corretta le due forchette si prendono <b>entrambe o nessuna</b>, dentro la sezione critica: è questo che elimina il deadlock.`
             },
             {
               id: "c2-lettori", label: "Lettori e scrittori",
-              desc: `<p>Molti lettori possono accedere <b>insieme</b> al database; uno scrittore deve avere accesso <b>esclusivo</b>.</p>
-                <p>Schema: un contatore <code>rc</code> dei lettori attivi, protetto da un mutex; il <b>primo</b> lettore che entra fa <code>down(db)</code>, l'<b>ultimo</b> che esce fa <code>up(db)</code>.</p>
-                <ul><li>Difetto della versione base: con lettori sempre in arrivo, lo scrittore può restare in <b>starvation</b> — si corregge accodando i nuovi lettori dietro allo scrittore in attesa.</li></ul>`
+              desc: `<p>Modella l'accesso a un database: molti <b>lettori</b> possono leggere <b>insieme</b>, ma uno <b>scrittore</b> deve avere accesso <b>esclusivo</b> (nessun altro scrittore e nessun lettore).</p>
+                <p>Schema: il contatore <code>rc</code> dei lettori attivi, protetto da <code>mutex</code>; il <b>primo</b> lettore che entra fa <code>down(db)</code> "a nome di tutti", l'<b>ultimo</b> che esce fa <code>up(db)</code>. I lettori intermedi non toccano <code>db</code>.</p>
+                <ul><li>Difetto della versione base: se arrivano lettori di continuo, <code>rc</code> non torna mai a 0 e lo scrittore resta in <b>starvation</b>.</li>
+                <li>Correzione: i lettori che arrivano <i>mentre</i> uno scrittore aspetta vengono accodati <b>dietro</b> a lui — meno parallelismo, ma niente starvation.</li></ul>`,
+              codeTitle: `lettori–scrittori con i semafori`,
+              code: `semaphore mutex = 1;     <span class="c">// protegge rc</span>
+semaphore db = 1;        <span class="c">// accesso esclusivo al database</span>
+int rc = 0;              <span class="c">// lettori attivi</span>
+
+void reader(void) {
+    while (TRUE) {
+        <span class="k">down</span>(&amp;mutex);
+        rc = rc + 1;
+        if (rc == 1) <span class="k">down</span>(&amp;db);   <span class="c">// il PRIMO blocca gli scrittori</span>
+        <span class="k">up</span>(&amp;mutex);
+
+        read_data_base();            <span class="c">// più lettori qui insieme</span>
+
+        <span class="k">down</span>(&amp;mutex);
+        rc = rc - 1;
+        if (rc == 0) <span class="k">up</span>(&amp;db);     <span class="c">// l'ULTIMO li rilascia</span>
+        <span class="k">up</span>(&amp;mutex);
+        use_data_read();
+    }
+}
+
+void writer(void) {
+    while (TRUE) {
+        think_up_data();
+        <span class="k">down</span>(&amp;db);                <span class="c">// accesso esclusivo</span>
+        write_data_base();
+        <span class="k">up</span>(&amp;db);
+    }
+}`,
+              tip: `Nota che lo scrittore fa <code>down(db)</code> e basta: non tocca <code>rc</code>. Tutta l'asimmetria del problema sta nel "primo entra / ultimo esce" dei lettori.`
             },
             {
               id: "c2-barbiere", label: "Barbiere che dorme",
-              desc: `<p>Un barbiere, una sedia, N sedie d'attesa. Tre semafori: <code>customers</code> (clienti in attesa), <code>barbers</code> (barbiere pronto), <code>mutex</code>, più un contatore <code>waiting</code>. Se non c'è posto, il cliente se ne va; se non ci sono clienti, il barbiere dorme.</p>`
+              desc: `<p>Un barbiere, una poltrona, N sedie d'attesa. Se non ci sono clienti il barbiere <b>dorme</b>; se arriva un cliente e il barbiere dorme, lo <b>sveglia</b>; se ci sono clienti ma nessuna sedia libera, il nuovo cliente <b>se ne va</b>.</p>
+                <p>Tre semafori: <code>customers</code> (clienti in attesa, 0), <code>barbers</code> (barbieri pronti, 0), <code>mutex</code> (1), più il contatore <code>waiting</code> per sapere se c'è posto.</p>`,
+              codeTitle: `barbiere che dorme`,
+              code: `semaphore customers = 0;   <span class="c">// clienti in attesa</span>
+semaphore barbers   = 0;   <span class="c">// barbieri liberi</span>
+semaphore mutex     = 1;
+int waiting = 0;           <span class="c">// clienti seduti in attesa</span>
+
+void barber(void) {
+    while (TRUE) {
+        <span class="k">down</span>(&amp;customers);   <span class="c">// nessun cliente? dormi</span>
+        <span class="k">down</span>(&amp;mutex);
+        waiting = waiting - 1;
+        <span class="k">up</span>(&amp;barbers);       <span class="c">// sono pronto</span>
+        <span class="k">up</span>(&amp;mutex);
+        cut_hair();
+    }
+}
+
+void customer(void) {
+    <span class="k">down</span>(&amp;mutex);
+    if (waiting &lt; CHAIRS) {
+        waiting = waiting + 1;
+        <span class="k">up</span>(&amp;customers);     <span class="c">// sveglia il barbiere se dorme</span>
+        <span class="k">up</span>(&amp;mutex);
+        <span class="k">down</span>(&amp;barbers);     <span class="c">// aspetta il tuo turno</span>
+        get_haircut();
+    } else {
+        <span class="k">up</span>(&amp;mutex);         <span class="c">// niente posto: vattene</span>
+    }
+}`
             }
           ]
         },
@@ -399,6 +713,16 @@ window.MAPPA = {
                 <li><b>Interattivi</b>: minimizzare il <b>tempo di risposta</b>.</li>
                 <li><b>Real-time</b>: rispettare le <b>scadenze</b>, evitare degrado della qualità.</li></ul>
                 <p><b>Turnaround</b> = fine − arrivo; <b>attesa</b> = turnaround − tempo di CPU.</p>`,
+              codeTitle: `le formule da usare negli esercizi`,
+              code: `turnaround(i) = fine(i) - arrivo(i)
+attesa(i)     = turnaround(i) - burst(i)
+turnaround medio = ( somma dei turnaround ) / n
+throughput    = lavori completati / tempo totale
+
+<span class="c">// Round-robin: peso del context switch</span>
+efficienza = quanto / (quanto + costo_switch)
+<span class="c">// quanto = 4 ms, switch = 1 ms  -&gt;  4/5 = 80% (20% sprecato)</span>
+<span class="c">// quanto = 100 ms, switch = 1 ms -&gt; 99%  (ma risposte lente)</span>`,
               tip: `Negli esercizi il turnaround si misura <b>dall'istante di arrivo</b>, non dall'istante 0: è l'errore più frequente.`
             },
             {
@@ -423,8 +747,20 @@ window.MAPPA = {
             },
             {
               id: "c2-spn", label: "SPN e aging",
-              desc: `<p><b>Shortest Process Next</b>: l'idea di SJF applicata ai sistemi interattivi, stimando la durata del prossimo burst dalla storia passata.</p>
-                <p><b>Aging</b>: media pesata fra stima precedente e ultima misura, <b>a·T₀ + (1−a)·T₁</b>. Con <i>a</i> = 1/2 basta sommare e dimezzare: le misure vecchie perdono peso esponenzialmente.</p>`
+              desc: `<p><b>Shortest Process Next</b>: l'idea di SJF applicata ai sistemi interattivi. Non conoscendo la durata del prossimo burst, la si <b>stima</b> dalla storia passata.</p>
+                <p><b>Aging</b>: media pesata fra la stima precedente e l'ultima misura, <b>a·T₀ + (1−a)·T₁</b>. Scegliendo <i>a</i> si decide quanta memoria dare al passato: <i>a</i> grande = stima inerziale, <i>a</i> piccolo = reattiva all'ultima misura.</p>`,
+              codeTitle: `aging con a = 1/2 (somma e dimezza)`,
+              code: `stima(n+1) = a * stima(n) + (1 - a) * misura(n)
+
+<span class="c">// con a = 1/2 basta sommare e dividere per 2:</span>
+T0 = 40                       <span class="c">// stima iniziale</span>
+misuro 20  -&gt; (40 + 20)/2 = 30
+misuro 20  -&gt; (30 + 20)/2 = 25
+misuro 20  -&gt; (25 + 20)/2 = 22.5
+misuro 20  -&gt; (22.5 + 20)/2 = 21.25   <span class="c">// converge verso 20</span>
+
+<span class="c">// il peso delle misure vecchie decade esponenzialmente:</span>
+<span class="c">// 1/2, 1/4, 1/8, 1/16 ...</span>`
             },
             {
               id: "c2-fair", label: "Garantito, lotteria, fair-share",
@@ -523,6 +859,20 @@ window.MAPPA = {
                 <ul><li><b>numero di pagina</b> = bit alti → indice nella tabella delle pagine;</li>
                 <li><b>offset</b> = bit bassi → copiato <b>invariato</b> nell'indirizzo fisico.</li></ul>
                 <p>Con pagine da 4 KB l'offset è di 12 bit (2¹² = 4096).</p>`,
+              codeTitle: `traduzione di un indirizzo virtuale`,
+              code: `<span class="c">// dati: pagine da 4 KB, indirizzo virtuale a 32 bit</span>
+offset  = 12 bit          <span class="c">// perché 2^12 = 4096 = 4 KB</span>
+n_pagina = 32 - 12 = 20 bit   <span class="c">// -&gt; 2^20 pagine, 1 M di voci</span>
+
+<span class="c">// indirizzo virtuale 8196 (decimale):</span>
+pagina = 8196 / 4096 = 2        <span class="c">// divisione intera</span>
+offset = 8196 % 4096 = 4        <span class="c">// resto</span>
+
+<span class="c">// se la tabella dice: pagina 2 -&gt; frame 6</span>
+fisico = 6 * 4096 + 4 = 24580   <span class="c">// frame * dim_pagina + offset</span>
+
+<span class="c">// in binario è solo una sostituzione di bit:</span>
+<span class="c">//   [ n_pagina | offset ]  -&gt;  [ n_frame | offset ]</span>`,
               tip: `L'offset non viene mai tradotto: cambia solo il numero di pagina → numero di frame. È la base di tutti gli esercizi di traduzione.`
             },
             {
@@ -536,7 +886,22 @@ window.MAPPA = {
             {
               id: "c3-fault", label: "Page fault",
               desc: `<p>La pagina richiesta non è in memoria (bit P = 0): la MMU genera una <b>trap</b> al SO, che salva il contesto, trova un frame libero (o ne <b>sceglie una vittima</b>, riscrivendola su disco se M = 1), carica la pagina, aggiorna la tabella e <b>rilancia l'istruzione interrotta</b>.</p>`,
-              tip: `Il page fault <b>non è un errore</b> del programma: è il meccanismo normale della memoria virtuale. L'errore è l'accesso a un indirizzo non valido (segmentation fault).`
+              codeTitle: `gestione di un page fault, passo per passo`,
+              code: `1. la MMU vede P = 0  -&gt; <span class="k">TRAP</span> al sistema operativo
+2. il SO salva PC e registri (contesto del processo)
+3. capisce quale pagina virtuale serviva
+4. controlla che l'indirizzo sia <b>valido</b> e permesso
+   <span class="c">// se non lo è: SIGSEGV, il processo muore</span>
+5. cerca un frame libero
+   se non c'è -&gt; sceglie una <b>vittima</b> (Clock/LRU/...)
+   se vittima.M == 1 -&gt; la riscrive su disco  <span class="c">// pagina sporca</span>
+6. legge la pagina richiesta dal disco nel frame
+   <span class="c">// il processo resta BLOCCATO durante l'I/O:</span>
+   <span class="c">// nel frattempo la CPU esegue qualcun altro</span>
+7. aggiorna la tabella delle pagine: P = 1, R = 0, M = 0
+8. ripristina il contesto e <b>rilancia l'istruzione</b> che aveva
+   causato il fault  <span class="c">// stavolta la traduzione riesce</span>`,
+              tip: `Il page fault <b>non è un errore</b> del programma: è il meccanismo normale della memoria virtuale. L'errore è l'accesso a un indirizzo <i>non valido</i> (segmentation fault), che il SO scopre al passo 4. E l'istruzione viene <b>rieseguita</b>, non ripresa a metà.`
             },
             {
               id: "c3-tlb", label: "TLB", sim: "sim_eat",
@@ -546,6 +911,18 @@ window.MAPPA = {
                 <li>Funziona grazie alla <b>località</b>: pochi frame coprono la grande maggioranza degli accessi.</li>
                 <li>Al context switch il TLB va <b>invalidato</b> (o le voci etichettate con l'ASID): è una delle voci di costo del cambio di processo.</li></ul>
                 <p><b>EAT</b> = h·(t<sub>TLB</sub> + t<sub>mem</sub>) + (1−h)·(t<sub>TLB</sub> + 2·t<sub>mem</sub>), con <i>h</i> = hit ratio.</p>`,
+              codeTitle: `EAT: esempio numerico`,
+              code: `EAT = h * (t_tlb + t_mem) + (1 - h) * (t_tlb + 2 * t_mem)
+      \\_____ hit _____/         \\________ miss ________/
+                                 <span class="c">// 2 accessi: tabella + dato</span>
+
+<span class="c">// t_tlb = 20 ns, t_mem = 100 ns, hit ratio h = 80%</span>
+EAT = 0.80 * (20 + 100) + 0.20 * (20 + 200)
+    = 0.80 * 120 + 0.20 * 220
+    = 96 + 44 = <span class="k">140 ns</span>
+
+<span class="c">// con h = 98%:  0.98*120 + 0.02*220 = 122 ns</span>
+<span class="c">// senza TLB sarebbe sempre 200 ns: ecco quanto vale la località</span>`,
               tip: `Attenzione all'ipotesi dell'esercizio: se il tempo di ricerca nel TLB è "trascurabile" sparisce il termine t<sub>TLB</sub>. E in caso di miss la memoria si accede <b>due</b> volte.`
             },
             {
@@ -578,20 +955,67 @@ window.MAPPA = {
             {
               id: "c3-fifo", label: "FIFO e anomalia di Belady",
               desc: `<p><b>FIFO</b>: si espelle la pagina caricata da più tempo. Semplicissimo, ma stupido: può buttare fuori una pagina vecchissima e usatissima.</p>
-                <p><b>Anomalia di Belady</b>: con FIFO può capitare che <b>aumentando i frame aumentino i page fault</b> — controintuitivo, ma dimostrabile con la stringa 0 1 2 3 0 1 4 0 1 2 3 4.</p>`,
-              tip: `LRU e OPT sono <b>algoritmi a stack</b> e <b>non soffrono</b> dell'anomalia di Belady; FIFO e seconda chance sì. Domanda ricorrente.`
+                <p><b>Anomalia di Belady</b>: con FIFO può capitare che <b>aumentando i frame aumentino i page fault</b> — controintuitivo, ma si dimostra con la stringa <code>0 1 2 3 0 1 4 0 1 2 3 4</code>.</p>`,
+              codeTitle: `anomalia di Belady: 3 frame vs 4 frame`,
+              code: `stringa: 0 1 2 3 0 1 4 0 1 2 3 4
+
+<span class="c">// con 3 frame -&gt; 9 page fault</span>
+0 1 2 | 3 0 1 | 4 . . | 2 3 .          <span class="c">// (. = hit)</span>
+
+<span class="c">// con 4 frame -&gt; 10 page fault  (!!)</span>
+0 1 2 3 | . . 4 0 | 1 2 3 4
+
+<span class="c">// PIÙ memoria, PIÙ fault: è l'anomalia.</span>
+<span class="c">// Succede perché FIFO ignora l'uso: con 4 frame le pagine</span>
+<span class="c">// 0 e 1 finiscono espulse proprio prima di essere richieste.</span>`,
+              tip: `LRU e OPT sono <b>algoritmi a stack</b> (con più frame l'insieme delle pagine residenti <i>contiene</i> quello con meno frame) e quindi <b>non soffrono</b> dell'anomalia; FIFO e seconda chance sì. Domanda ricorrente.`
             },
             {
               id: "c3-clock", label: "Seconda chance e Clock", sim: "sim_pages",
               desc: `<p><b>Seconda chance</b>: FIFO che però guarda il bit R della pagina più vecchia. Se R = 1, non la espelle: azzera R, la <b>rimette in coda</b> come se fosse appena arrivata, e prosegue. Se R = 0, la espelle.</p>
-                <p><b>Clock</b>: identico nel comportamento, ma le pagine sono in una <b>lista circolare</b> con una lancetta. Invece di spostare le pagine si sposta la lancetta — stessa politica, molto più efficiente.</p>`,
-              tip: `Clock e seconda chance producono <b>la stessa sequenza di vittime</b>: cambia solo l'implementazione. Se tutte le pagine hanno R = 1, la lancetta fa un giro completo azzerando tutto e degenera in FIFO.`
+                <p><b>Clock</b>: identico nel comportamento, ma le pagine sono in una <b>lista circolare</b> con una lancetta. Invece di spostare le pagine in coda si sposta la lancetta — stessa politica, molto più efficiente.</p>`,
+              codeTitle: `algoritmo Clock`,
+              code: `page_fault():
+    while (TRUE):
+        p = pagina puntata dalla lancetta
+
+        if (p.R == 0):
+            <span class="c">// non usata di recente: è la vittima</span>
+            if (p.M == 1) scrivi p su disco   <span class="c">// era sporca</span>
+            carica la nuova pagina al posto di p
+            avanza la lancetta
+            return
+
+        else:
+            p.R = 0            <span class="c">// seconda chance:</span>
+            avanza la lancetta <span class="c">// azzera R e passa alla prossima</span>
+
+<span class="c">// Se TUTTE le pagine hanno R = 1, la lancetta fa un giro intero</span>
+<span class="c">// azzerando i bit e torna al punto di partenza, che ora ha R = 0:</span>
+<span class="c">// espelle la più vecchia -&gt; degenera in FIFO.</span>`,
+              tip: `Clock e seconda chance producono <b>la stessa sequenza di vittime</b>: cambia solo l'implementazione (lista circolare + lancetta invece di spostare le pagine in coda).`
             },
             {
               id: "c3-lru", label: "LRU e aging",
               desc: `<p><b>LRU</b> (Least Recently Used): espelle la pagina non usata da più tempo. Ottima approssimazione dell'ottimale (il passato recente predice il futuro prossimo), ma costosa: richiede hardware speciale (lista aggiornata a ogni accesso, o un contatore per voce).</p>
-                <p><b>Aging</b>: approssimazione software. Ogni pagina ha un contatore a <i>n</i> bit; a ogni tick il contatore viene <b>shiftato a destra</b> e il bit R viene inserito <b>a sinistra</b> (bit più significativo). Si espelle il contatore più basso.</p>
-                <ul><li>Differenza da LRU: l'aging ha memoria finita (n tick) e, dentro lo stesso tick, non distingue l'ordine degli accessi.</li></ul>`
+                <p><b>Aging</b>: approssimazione software. Ogni pagina ha un contatore a <i>n</i> bit; a ogni tick il contatore viene <b>shiftato a destra</b> e il bit R viene inserito <b>a sinistra</b> (nel bit più significativo). Si espelle il contatore più basso.</p>
+                <p>Così un accesso <i>recente</i> pesa più di molti accessi <i>vecchi</i>: è esattamente lo spirito di LRU.</p>
+                <ul><li>Differenza da LRU: l'aging ha memoria finita (n tick) e, dentro lo stesso tick, non distingue l'ordine degli accessi.</li></ul>`,
+              codeTitle: `aging: shift a destra, R entra da sinistra`,
+              code: `ogni tick di clock:
+    for (ogni pagina p):
+        p.contatore = (p.contatore &gt;&gt; 1) | (p.R &lt;&lt; 7)   <span class="c">// 8 bit</span>
+        p.R = 0
+
+<span class="c">// esempio su 4 tick, contatori a 8 bit:</span>
+<span class="c">// pagina  R:1 0 1 0     contatore dopo ogni tick</span>
+        tick 1 (R=1)   10000000
+        tick 2 (R=0)   01000000
+        tick 3 (R=1)   10100000
+        tick 4 (R=0)   01010000
+
+<span class="c">// vittima = contatore PIÙ BASSO (usata meno di recente)</span>
+<span class="c">// 00110000 &lt; 01000000: un accesso recente batte due vecchi.</span>`
             },
             {
               id: "c3-wsclock", label: "Working set e WSClock",
@@ -611,7 +1035,21 @@ window.MAPPA = {
             {
               id: "c3-workingset", label: "Working set",
               desc: `<p>Il <b>working set</b> è l'insieme delle pagine usate dal processo nelle ultime <i>k</i> referenze (o nell'ultimo intervallo di tempo virtuale τ). Se il working set sta in memoria, i page fault sono rari.</p>
-                <p><b>Prepaginazione</b>: al ripristino di un processo swappato, si ricaricano subito le pagine del suo working set invece di aspettare un fault per ciascuna.</p>`
+                <p><b>Prepaginazione</b>: al ripristino di un processo swappato, si ricaricano subito le pagine del suo working set invece di aspettare un fault per ciascuna.</p>`,
+              codeTitle: `calcolo del working set W(t, k)`,
+              code: `<span class="c">// W(t,k) = pagine DISTINTE usate nelle ultime k referenze</span>
+riferimenti: 2 6 1 5 7 7 7 5 1 6 2 3 4 1 2 3 4 4 4 3 4
+                                     ^t1              ^t2
+
+k = 10:
+  W(t1, 10) = {1, 2, 5, 6, 7}   -&gt; |W| = 5 pagine
+  W(t2, 10) = {1, 2, 3, 4}      -&gt; |W| = 4 pagine
+
+<span class="c">// al processo servono almeno |W| frame:</span>
+<span class="c">//   frame &gt;= |W|  -&gt; pochi page fault</span>
+<span class="c">//   frame &lt;  |W|  -&gt; thrashing</span>
+<span class="c">// somma dei working set &gt; frame totali del sistema</span>
+<span class="c">//   =&gt; ridurre il grado di multiprogrammazione (swap out)</span>`
             },
             {
               id: "c3-thrash", label: "Thrashing",
@@ -635,7 +1073,19 @@ window.MAPPA = {
               desc: `<p>Compromesso:</p>
                 <ul><li><b>Pagine piccole</b> → meno frammentazione interna, working set più aderente… ma <b>tabelle delle pagine enormi</b> e più overhead di trasferimento.</li>
                 <li><b>Pagine grandi</b> → tabelle piccole e trasferimenti da disco più efficienti… ma più spazio sprecato nell'ultima pagina.</li></ul>
-                <p>Con <i>s</i> = dimensione media del processo, <i>e</i> = byte per voce di tabella, l'overhead totale è minimizzato da <b>p = √(2·s·e)</b>. In pratica: 4 KB.</p>`
+                <p>Con <i>s</i> = dimensione media del processo, <i>e</i> = byte per voce di tabella, l'overhead totale è minimizzato da <b>p = √(2·s·e)</b>. In pratica: 4 KB.</p>`,
+              codeTitle: `dimensione ottimale della pagina`,
+              code: `overhead(p) = s*e/p  +  p/2
+              \\_____/     \\___/
+          tabella pagine   frammentazione
+          (piu' voci se     interna (mezza
+           p e' piccola)    pagina sprecata)
+
+<span class="c">// derivando e ponendo = 0:</span>
+p_ottimo = sqrt(2 * s * e)
+
+<span class="c">// s = 1 MB (processo medio), e = 8 byte per voce:</span>
+p = sqrt(2 * 1048576 * 8) = sqrt(16777216) = <span class="k">4096 byte</span>`
             },
             {
               id: "c3-ied", label: "Spazi I e D, pagine condivise",
@@ -699,7 +1149,21 @@ window.MAPPA = {
               id: "c4-link", label: "Link fisici e simbolici",
               desc: `<p><b>Hard link</b>: una seconda voce di directory che punta <b>allo stesso i-node</b>; l'i-node tiene un <b>contatore dei link</b> e il file esiste finché il contatore è &gt; 0. Non può attraversare i file system e non può puntare a una directory.</p>
                 <p><b>Link simbolico</b>: un file speciale che <b>contiene il pathname</b> di un altro file. Può attraversare i file system e puntare a directory, ma se l'originale viene cancellato resta <b>pendente</b> (dangling), e ogni accesso costa una risoluzione in più.</p>`,
-              tip: `Cancellare il file "originale" non rompe un hard link (il contatore scende solo a 1), ma rompe un link simbolico. È la domanda tipica.`
+              codeTitle: `hard link vs link simbolico`,
+              code: `$ ln    a.txt  duro.txt    <span class="c">// hard link: stesso i-node</span>
+$ ln -s a.txt  soft.txt    <span class="c">// simbolico: file che contiene "a.txt"</span>
+
+i-node 27 [ contatore link = 2 ]  &lt;- a.txt, duro.txt
+i-node 41 [ contenuto: "a.txt" ]  &lt;- soft.txt
+
+$ rm a.txt
+  i-node 27: contatore 2 -&gt; 1     <span class="c">// il file VIVE ancora</span>
+  duro.txt  -&gt; funziona   <span class="k">OK</span>
+  soft.txt  -&gt; punta a un nome che non esiste piu': <span class="k">dangling</span>
+
+<span class="c">// il file viene davvero cancellato solo quando</span>
+<span class="c">// il contatore dei link arriva a 0</span>`,
+              tip: `Cancellare il file "originale" non rompe un hard link (i nomi sono <b>pari</b>: nessuno è più originale dell'altro), ma rompe un link simbolico. È la domanda tipica.`
             }
           ]
         },
@@ -729,7 +1193,21 @@ window.MAPPA = {
               id: "c4-inode", label: "i-node", sim: "sim_inode",
               desc: `<p>A ogni file è associato un <b>i-node</b>: attributi + indirizzi dei blocchi. In memoria serve solo l'i-node dei file <b>aperti</b> — la memoria occupata è proporzionale ai file aperti, non alla dimensione del disco. È la soluzione di UNIX/Linux.</p>
                 <p>Indirizzamento a più livelli: alcuni puntatori <b>diretti</b> (i primi blocchi, quindi i file piccoli si risolvono subito), poi <b>indiretto singolo</b>, <b>indiretto doppio</b> e <b>indiretto triplo</b>, che aggiungono capacità enorme al costo di qualche accesso in più.</p>`,
-              tip: `Esercizio ricorrente: dimensione massima del file. Con blocchi da <i>B</i> byte e puntatori da <i>p</i> byte, ogni blocco indice contiene <b>k = B/p</b> puntatori → capacità = (diretti + k + k² + k³) · B.`
+              codeTitle: `dimensione massima di un file`,
+              code: `<span class="c">// dati: blocchi da 1 KB, puntatori da 4 byte, 12 diretti</span>
+k = B / p = 1024 / 4 = <span class="k">256</span>   <span class="c">// puntatori per blocco indice</span>
+
+diretti          : 12          blocchi
+indiretto singolo:      k =    256
+indiretto doppio :    k^2 = 65 536
+indiretto triplo :    k^3 = 16 777 216
+                     ------------------
+totale = 12 + k + k^2 + k^3 = 16 843 020 blocchi
+max    = 16 843 020 * 1 KB ~= <span class="k">16 GB</span>
+
+<span class="c">// accessi a disco per leggere UN blocco (senza cache):</span>
+<span class="c">//   diretto: 1 | ind. singolo: 2 | doppio: 3 | triplo: 4</span>`,
+              tip: `Esercizio ricorrente: con blocchi da <i>B</i> byte e puntatori da <i>p</i> byte, ogni blocco indice contiene <b>k = B/p</b> puntatori → capacità = (diretti + k + k² + k³) · B. Il grosso lo fa sempre l'indiretto triplo.`
             },
             {
               id: "c4-dirimpl", label: "Implementazione delle directory",
@@ -781,7 +1259,24 @@ window.MAPPA = {
                 <li><b>SCAN</b> (ascensore): il braccio va in una direzione servendo tutto ciò che incontra, poi arriva <b>all'estremo del disco</b>, inverte e torna.</li>
                 <li><b>LOOK</b>: come SCAN, ma inverte <b>dopo l'ultima richiesta pendente</b> in quella direzione, senza arrivare all'estremo.</li>
                 <li><b>C-SCAN / C-LOOK</b>: serve solo <b>in una direzione</b>; arrivato in fondo torna all'inizio senza servire nulla nel viaggio di ritorno. Attesa più uniforme.</li></ul>`,
-              tip: `Convenzione del corso: <b>LOOK inverte dopo l'ultima richiesta</b>, non al bordo del disco — è la differenza con SCAN, ed è messa apposta fra i distrattori. Somma sempre gli <b>spostamenti in valore assoluto</b>.`
+              codeTitle: `stesso esempio, quattro algoritmi`,
+              code: `<span class="c">// testina a 53, disco 0..199, direzione: verso l'alto</span>
+<span class="c">// richieste: 98 183 37 122 14 124 65 67</span>
+
+FCFS : 53-98-183-37-122-14-124-65-67
+       spostamento totale = <span class="k">640</span>
+
+SSTF : 53-65-67-37-14-98-122-124-183   <span class="c">// sempre la più vicina</span>
+       totale = <span class="k">236</span>          <span class="c">// ottimo, ma affama i lontani</span>
+
+SCAN : 53-65-67-98-122-124-183-<span class="k">199</span>-37-14
+       totale = 146 + 185 = <span class="k">331</span>   <span class="c">// tocca il BORDO (199)</span>
+
+LOOK : 53-65-67-98-122-124-183-37-14
+       totale = 130 + 169 = <span class="k">299</span>   <span class="c">// inverte dopo l'ULTIMA richiesta</span>
+
+<span class="c">// somma sempre |differenze| fra cilindri consecutivi</span>`,
+              tip: `Convenzione del corso: <b>LOOK inverte dopo l'ultima richiesta</b>, SCAN arriva fino al <b>bordo del disco</b>. È la differenza messa apposta fra i distrattori — nell'esempio qui sopra vale 32 cilindri.`
             },
             {
               id: "c4-raid", label: "RAID", sim: "sim_raid",
@@ -798,7 +1293,24 @@ window.MAPPA = {
                 <p>Se un disco si rompe, il blocco perduto si ricalcola con lo XOR di <b>tutti gli altri</b>, parità inclusa: <code>D₂ = D₁ ⊕ D₃ ⊕ P</code>.</p>
                 <ul><li>Regge la rottura di <b>un solo</b> disco (RAID 6, con due parità, ne regge due).</li>
                 <li>Ogni scrittura richiede di aggiornare anche la parità: è la <i>write penalty</i>.</li></ul>`,
-              tip: `Lo XOR è associativo e commutativo, e x ⊕ x = 0: per questo la formula di ricostruzione funziona sostituendo un dato qualunque con P.`
+              codeTitle: `XOR: calcolo e ricostruzione`,
+              code: `<span class="c">// tabella dello XOR: 1 se i bit sono DIVERSI</span>
+0^0 = 0   0^1 = 1   1^0 = 1   1^1 = 0
+<span class="c">// proprietà chiave:  x ^ x = 0    e    x ^ 0 = x</span>
+
+<span class="c">// striscia su 3 dischi dati + 1 di parità</span>
+D1 = 1011
+D2 = 0110
+D3 = 1100
+P  = D1 ^ D2 ^ D3
+   = 1011 ^ 0110 = 1101
+   = 1101 ^ 1100 = <span class="k">0001</span>
+
+<span class="c">// si rompe D2: lo si ricostruisce con TUTTI gli altri + P</span>
+D2 = D1 ^ D3 ^ P
+   = 1011 ^ 1100 = 0111
+   = 0111 ^ 0001 = <span class="k">0110</span>   <span class="c">// ...ed è proprio D2</span>`,
+              tip: `Lo XOR è associativo e commutativo, e <b>x ⊕ x = 0</b>: per questo la stessa formula serve sia a calcolare la parità sia a ricostruire un dato qualunque. Verifica sempre il risultato rifacendo lo XOR di tutta la striscia: deve tornare la parità.`
             },
             {
               id: "c4-ssd", label: "SSD",
