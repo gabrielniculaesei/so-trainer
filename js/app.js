@@ -11,7 +11,7 @@
   const DAY = 86400000;
   // Leitner: box 1..5 → giorni al prossimo ripasso
   const SRS_DAYS = [1, 1, 3, 7, 14, 30];
-  let store = { mcq: {}, oral: {}, exams: [], exQ: {}, theme: null };
+  let store = { mcq: {}, oral: {}, exams: [], exQ: {}, map: {}, theme: null };
   let migratedV1 = false;
   (function loadStore() {
     try {
@@ -30,6 +30,7 @@
   })();
   store.mcq = store.mcq || {}; store.oral = store.oral || {};
   store.exams = store.exams || []; store.exQ = store.exQ || {};
+  store.map = store.map || {}; // nodi della mappa mentale segnati come "ripassato"
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) { } };
   if (migratedV1) save(); // rendi durevole la migrazione fin dal primo avvio
 
@@ -68,7 +69,7 @@
   });
 
   // navigazione tra le sezioni
-  const views = ["home", "quiz", "esercizi", "sim", "esame", "orale", "stats"];
+  const views = ["home", "quiz", "esercizi", "mappa", "sim", "esame", "orale", "stats"];
   async function show(name) {
     // conferma prima di abbandonare un esame in corso
     if (exam && !exam.done && name !== "esame") {
@@ -86,6 +87,8 @@
     window.scrollTo(0, 0);
     if (name === "home") { focusTerm(); renderToday(); }
     if (name === "stats") renderStats();
+    // la mappa si misura solo da montata: il primo mount avviene qui, i successivi ricentrano
+    if (name === "mappa" && window.MAPPA_UI) window.MAPPA_UI.mount();
   }
   $$("nav button").forEach(b => b.addEventListener("click", () => show(b.dataset.view)));
   $$(".app").forEach(c => c.addEventListener("click", () => show(c.dataset.view)));
@@ -604,7 +607,7 @@
 
   // Terminale interattivo nella home
   const termOut = $("#termOut"), termIn = $("#termIn"), termScr = $("#termScr");
-  const NAV = { home: "home", quiz: "quiz", esercizi: "esercizi", esercizio: "esercizi", sim: "sim", simulazioni: "sim", algoritmi: "sim", esame: "esame", orale: "orale", aperte: "orale", aperta: "orale", teoria: "orale", stats: "stats", statistiche: "stats" };
+  const NAV = { home: "home", quiz: "quiz", esercizi: "esercizi", esercizio: "esercizi", mappa: "mappa", map: "mappa", mindmap: "mappa", sim: "sim", simulazioni: "sim", algoritmi: "sim", esame: "esame", orale: "orale", aperte: "orale", aperta: "orale", teoria: "orale", stats: "stats", statistiche: "stats" };
   const PS1 = `<span class="term-ps1">user@so-trainer<span class="term-tld">:~$</span></span>`;
   const termHist = []; let termHistI = 0;
 
@@ -620,7 +623,7 @@
     if (!termOut) return;
     termOut.innerHTML = "";
     termPrint("SO-Trainer — preparazione teoria di Sistemi Operativi", "term-hi");
-    termPrint(`${window.MCQ.length} crocette · ${CARDS.length} flashcard · ${window.ESERCIZI.length} esercizi · ${window.GENERATORS.length} generatori · ${window.SIMS.length} simulazioni`);
+    termPrint(`${window.MCQ.length} crocette · ${CARDS.length} flashcard · ${window.ESERCIZI.length} esercizi · ${window.GENERATORS.length} generatori · ${window.SIMS.length} simulazioni · mappa con ${window.MAPPA_UI ? window.MAPPA_UI.total() : 0} concetti`);
     termPrint("Scrivi <b>help</b> per i comandi (prova <b>today</b>), oppure clicca una voce qui sotto.", "term-dim2");
   }
   function termFetch() {
@@ -647,11 +650,11 @@
     const arg = parts.slice(1).join(" ");
 
     if (word === "help" || word === "?" || word === "aiuto") {
-      termPrint("<b>quiz</b> · <b>esercizi</b> · <b>sim</b> · <b>esame</b> · <b>orale</b> · <b>stats</b> — apre la sezione");
+      termPrint("<b>quiz</b> · <b>esercizi</b> · <b>mappa</b> · <b>sim</b> · <b>esame</b> · <b>orale</b> · <b>stats</b> — apre la sezione");
       termPrint("<b>today</b> il ripasso del giorno · <b>ls</b> elenca · <b>clear</b> pulisce · <b>whoami</b> · <b>date</b> · <b>neofetch</b>");
       termPrint("puoi anche scrivere <b>./esercizi</b>", "term-dim2");
     } else if (word === "ls" || word === "ll" || word === "dir") {
-      termPrint("quiz/   esercizi/   sim/   esame/   orale/   stats/");
+      termPrint("quiz/   esercizi/   mappa/   sim/   esame/   orale/   stats/");
     } else if (word === "today" || word === "oggi" || word === "ripasso") {
       termToday();
     } else if (word === "clear" || word === "cls") {
@@ -825,6 +828,7 @@
         if (d.oral) Object.assign(store.oral, d.oral);
         if (d.aperte) Object.assign(store.oral, d.aperte); // vecchio formato
         if (d.exQ) Object.assign(store.exQ, d.exQ);
+        if (d.map) Object.assign(store.map, d.map);
         if (Array.isArray(d.exams)) store.exams = d.exams;
         save(); renderStats(); updateQuizCount(); updateOralCount();
         toast("Progresso importato.");
@@ -869,6 +873,14 @@
     $("#statsOpen").innerHTML = eA
       ? `Esercizi autovalutati: <b>${eC}/${eA}</b> corretti (${Math.round(100 * eC / eA)}%).`
       : "Esercizi: nessuna autovalutazione registrata.";
+    // ripasso sulla mappa mentale
+    const mapEl = $("#statsMap");
+    if (mapEl && window.MAPPA_UI) {
+      const tot = window.MAPPA_UI.total(), done = Object.keys(store.map).length;
+      mapEl.innerHTML = done
+        ? `Mappa mentale: <b>${done}/${tot}</b> concetti segnati come ripassati (${Math.round(100 * done / tot)}%).`
+        : "Mappa mentale: nessun concetto ancora segnato come ripassato.";
+    }
     renderExamHistory();
   }
   function renderExamHistory() {
@@ -898,6 +910,48 @@
     statsImportBtn.addEventListener("click", () => statsImportFile.click());
     statsImportFile.addEventListener("change", () => { if (statsImportFile.files[0]) importProgress(statsImportFile.files[0]); statsImportFile.value = ""; });
   }
+
+  // ---- Ponte per la mappa mentale (js/mappa.js): naviga verso le altre sezioni e salva i "ripassato" ----
+  function setChips(containerId, keys) {
+    $$(containerId + " .chip").forEach(c => {
+      const on = keys.includes(c.dataset.topic);
+      c.classList.toggle("on", on);
+      c.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+  }
+  const macroOf = topic => Object.keys(window.MACRO).find(k => window.MACRO[k].topics.includes(topic));
+
+  window.APP = {
+    // dalla mappa al quiz filtrato sul macro-argomento del nodo
+    quizTopic(topic) {
+      const m = macroOf(topic);
+      if (!m) return;
+      show("quiz").then(() => {
+        clearSession();
+        $("#quizPlay").classList.add("hidden");
+        $("#quizEnd").classList.add("hidden");
+        $("#quizSetup").classList.remove("hidden");
+        $("#quizOnlyWrong").checked = false;
+        setChips("#quizChips", [m]);
+        updateQuizCount();
+      });
+    },
+    // dalla mappa alle flashcard dello stesso topic
+    oralTopic(topic) {
+      show("orale").then(() => {
+        $("#oralPlay").classList.add("hidden");
+        $("#oralSetup").classList.remove("hidden");
+        setChips("#oralChips", [topic]);
+        updateOralCount();
+      });
+    },
+    openSimById(id) {
+      const s = window.SIMS.find(x => x.id === id);
+      if (s) show("sim").then(() => openSim(s));
+    },
+    mapStore() { return store.map; },
+    mapToggle(id, on) { if (on) store.map[id] = 1; else delete store.map[id]; save(); }
+  };
 
   // avvio
   applyTheme();

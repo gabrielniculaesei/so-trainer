@@ -40,6 +40,7 @@
       <button data-view="home" class="active">home</button>
       <button data-view="quiz">quiz</button>
       <button data-view="esercizi">esercizi</button>
+      <button data-view="mappa">mappa</button>
       <button data-view="sim">sim</button>
       <button data-view="esame">esame</button>
       <button data-view="orale">orale</button>
@@ -86,6 +87,10 @@
       <button class="app" data-view="esercizi">
         <span class="app-cmd">esercizi</span>
         <span class="app-desc">esercizi risolti e generatori con parametri casuali</span>
+      </button>
+      <button class="app" data-view="mappa">
+        <span class="app-cmd">mappa</span>
+        <span class="app-desc">mappa mentale del corso: clicca un concetto e leggi la spiegazione</span>
       </button>
       <button class="app" data-view="sim">
         <span class="app-cmd">sim</span>
@@ -160,6 +165,33 @@
     <div id="genList"></div>
     <h2>esercizi risolti</h2>
     <div id="exList"></div>
+  </section>
+
+  <!-- ==================== MAPPA MENTALE ==================== -->
+  <section id="view-mappa" class="view">
+    <h1>mappa mentale</h1>
+    <p class="lead">Tutta la teoria in un albero. Apri i rami, clicca un concetto e leggi la spiegazione nel pannello: è il ripasso da fare nei giorni prima dell'esame, per rivedere l'impianto invece delle singole domande.</p>
+
+    <div class="map-toolbar">
+      <input id="mapSearch" class="map-search" type="search" placeholder="cerca un concetto (es. thrashing, TSL, LOOK)…" autocomplete="off" spellcheck="false" aria-label="cerca nella mappa">
+      <button class="btn small secondary" id="mapExpand">espandi tutto</button>
+      <button class="btn small secondary" id="mapCollapse">comprimi</button>
+      <button class="btn small secondary" id="mapFit">centra</button>
+      <div class="map-zoom">
+        <button id="mapOut" aria-label="riduci">−</button>
+        <span id="mapZoomLbl">100%</span>
+        <button id="mapIn" aria-label="ingrandisci">+</button>
+      </div>
+      <div id="mapProg" class="mapprog"></div>
+    </div>
+
+    <div class="map-wrap">
+      <div class="map-canvas" id="mapCanvas">
+        <div class="map-stage" id="mapStage"></div>
+        <div class="map-hint">trascina per spostarti · ⌘/ctrl + rotellina per lo zoom</div>
+      </div>
+      <aside class="map-panel card" id="mapPanel"></aside>
+    </div>
   </section>
 
   <!-- ==================== SIMULAZIONI INTERATTIVE ==================== -->
@@ -272,6 +304,7 @@
       <p id="statsTotal"></p>
       <p id="statsOral"></p>
       <p id="statsOpen"></p>
+      <p id="statsMap"></p>
       <div id="statsBox" style="margin-top:1rem"></div>
       <div id="statsExams" style="margin-top:1rem"></div>
       <div class="quiz-controls">
@@ -311,9 +344,11 @@
 <script src="data/generators2.js"></script>
 <script src="data/generators3.js"></script>
 <script src="data/generators4.js"></script>
+<script src="data/data_mappa.js"></script>
 <script src="js/sims.js"></script>
 <script src="js/sims2.js"></script>
 <script src="js/sims3.js"></script>
+<script src="js/mappa.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
