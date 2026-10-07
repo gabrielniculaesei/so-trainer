@@ -31,6 +31,7 @@
   store.mcq = store.mcq || {}; store.oral = store.oral || {};
   store.exams = store.exams || []; store.exQ = store.exQ || {};
   store.map = store.map || {}; // nodi della mappa mentale segnati come "ripassato"
+  store.lab = store.lab || { kata: {} }; // progressi dei kata di laboratorio (non toccati da "azzera statistiche")
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) { } };
   if (migratedV1) save(); // rendi durevole la migrazione fin dal primo avvio
 
@@ -69,7 +70,7 @@
   });
 
   // navigazione tra le sezioni
-  const views = ["home", "quiz", "esercizi", "mappa", "sim", "esame", "orale", "stats"];
+  const views = ["home", "quiz", "esercizi", "mappa", "sim", "lab", "esame", "orale", "stats"];
   async function show(name) {
     // conferma prima di abbandonare un esame in corso
     if (exam && !exam.done && name !== "esame") {
@@ -89,6 +90,7 @@
     if (name === "stats") renderStats();
     // la mappa si misura solo da montata: il primo mount avviene qui, i successivi ricentrano
     if (name === "mappa" && window.MAPPA_UI) window.MAPPA_UI.mount();
+    if (name === "lab" && window.LAB_UI) window.LAB_UI.mount();
   }
   $$("nav button").forEach(b => b.addEventListener("click", () => show(b.dataset.view)));
   $$(".app").forEach(c => c.addEventListener("click", () => show(c.dataset.view)));
@@ -607,7 +609,7 @@
 
   // Terminale interattivo nella home
   const termOut = $("#termOut"), termIn = $("#termIn"), termScr = $("#termScr");
-  const NAV = { home: "home", quiz: "quiz", esercizi: "esercizi", esercizio: "esercizi", mappa: "mappa", map: "mappa", mindmap: "mappa", sim: "sim", simulazioni: "sim", algoritmi: "sim", esame: "esame", orale: "orale", aperte: "orale", aperta: "orale", teoria: "orale", stats: "stats", statistiche: "stats" };
+  const NAV = { home: "home", quiz: "quiz", esercizi: "esercizi", esercizio: "esercizi", mappa: "mappa", map: "mappa", mindmap: "mappa", sim: "sim", simulazioni: "sim", algoritmi: "sim", lab: "lab", laboratorio: "lab", kata: "lab", manuale: "lab", esame: "esame", orale: "orale", aperte: "orale", aperta: "orale", teoria: "orale", stats: "stats", statistiche: "stats" };
   const PS1 = `<span class="term-ps1">user@so-trainer<span class="term-tld">:~$</span></span>`;
   const termHist = []; let termHistI = 0;
 
@@ -623,7 +625,7 @@
     if (!termOut) return;
     termOut.innerHTML = "";
     termPrint("SO-Trainer — preparazione teoria di Sistemi Operativi", "term-hi");
-    termPrint(`${window.MCQ.length} crocette · ${CARDS.length} flashcard · ${window.ESERCIZI.length} esercizi · ${window.GENERATORS.length} generatori · ${window.SIMS.length} simulazioni · mappa con ${window.MAPPA_UI ? window.MAPPA_UI.total() : 0} concetti`);
+    termPrint(`${window.MCQ.length} crocette · ${CARDS.length} flashcard · ${window.ESERCIZI.length} esercizi · ${window.GENERATORS.length} generatori · ${window.SIMS.length} simulazioni · mappa con ${window.MAPPA_UI ? window.MAPPA_UI.total() : 0} concetti · lab: ${(window.LAB_KATA || []).length} kata e ${(window.LAB_FUNZIONI || []).length} schede`);
     termPrint("Scrivi <b>help</b> per i comandi (prova <b>today</b>), oppure clicca una voce qui sotto.", "term-dim2");
   }
   function termFetch() {
@@ -635,7 +637,8 @@
       "Crocette : " + window.MCQ.length,
       "Flashcard: " + CARDS.length + " (orale + teoria)",
       "Esercizi : " + window.ESERCIZI.length + " risolti + " + window.GENERATORS.length + " generatori",
-      "Sim      : " + window.SIMS.length + " interattive"
+      "Sim      : " + window.SIMS.length + " interattive",
+      "Lab      : " + (window.LAB_KATA || []).length + " kata · " + (window.LAB_FUNZIONI || []).length + " schede del manuale"
     ];
     termPrint("<pre class='term-fetch'>" + L.map(esc).join("\n") + "</pre>");
   }
@@ -650,11 +653,11 @@
     const arg = parts.slice(1).join(" ");
 
     if (word === "help" || word === "?" || word === "aiuto") {
-      termPrint("<b>quiz</b> · <b>esercizi</b> · <b>mappa</b> · <b>sim</b> · <b>esame</b> · <b>orale</b> · <b>stats</b> — apre la sezione");
+      termPrint("<b>quiz</b> · <b>esercizi</b> · <b>mappa</b> · <b>sim</b> · <b>lab</b> · <b>esame</b> · <b>orale</b> · <b>stats</b> — apre la sezione");
       termPrint("<b>today</b> il ripasso del giorno · <b>ls</b> elenca · <b>clear</b> pulisce · <b>whoami</b> · <b>date</b> · <b>neofetch</b>");
       termPrint("puoi anche scrivere <b>./esercizi</b>", "term-dim2");
     } else if (word === "ls" || word === "ll" || word === "dir") {
-      termPrint("quiz/   esercizi/   mappa/   sim/   esame/   orale/   stats/");
+      termPrint("quiz/   esercizi/   mappa/   sim/   lab/   esame/   orale/   stats/");
     } else if (word === "today" || word === "oggi" || word === "ripasso") {
       termToday();
     } else if (word === "clear" || word === "cls") {
@@ -716,6 +719,8 @@
     if (d.due) parts.push(`<b>${d.due}</b> flashcard in scadenza`);
     if (d.wrong) parts.push(`<b>${d.wrong}</b> crocette sbagliate di recente`);
     if (d.weak) parts.push(`argomento più debole: <b>${window.TOPICS[d.weak.k]}</b> (${Math.round(d.weak.pct * 100)}%)`);
+    const kataDue = window.LAB_UI ? window.LAB_UI.dueCount() : 0;
+    if (kataDue) parts.push(`<b>${kataDue}</b> kata di laboratorio da riscrivere`);
     box.innerHTML = `<div class="today-h">ripasso del giorno</div>
       <p>${parts.length ? parts.join(" · ") : "Nessuno scadenzario ancora: fai un giro di quiz o di flashcard per iniziare."}</p>
       <div class="quiz-controls">
@@ -830,6 +835,7 @@
         if (d.exQ) Object.assign(store.exQ, d.exQ);
         if (d.map) Object.assign(store.map, d.map);
         if (Array.isArray(d.exams)) store.exams = d.exams;
+        if (d.lab && d.lab.kata) Object.assign(store.lab.kata, d.lab.kata);
         save(); renderStats(); updateQuizCount(); updateOralCount();
         toast("Progresso importato.");
       } catch (e) { toast("File non valido."); }
@@ -880,6 +886,17 @@
       mapEl.innerHTML = done
         ? `Mappa mentale: <b>${done}/${tot}</b> concetti segnati come ripassati (${Math.round(100 * done / tot)}%).`
         : "Mappa mentale: nessun concetto ancora segnato come ripassato.";
+    }
+    // laboratorio: progressi separati, non toccati da "azzera statistiche"
+    const labEl = $("#statsLab");
+    if (labEl && window.LAB_KATA) {
+      const ks = store.lab.kata || {}, tot = window.LAB_KATA.length;
+      const passed = l => window.LAB_KATA.filter(x => ks[x.id] && ks[x.id].pass && ks[x.id].pass[l]).length;
+      const started = window.LAB_KATA.filter(x => ks[x.id] && Object.keys(ks[x.id].pass || {}).length).length;
+      const due = window.LAB_UI ? window.LAB_UI.dueCount() : 0;
+      labEl.innerHTML = started
+        ? `Laboratorio: <b>${passed(3)}/${tot}</b> kata superati a foglio bianco · ${passed(1)}/${tot} al livello 1 · ${passed(2)}/${tot} al livello 2 · <b>${due}</b> da riscrivere oggi. Si azzerano solo dalla vista lab.`
+        : "Laboratorio: nessun kata superato ancora.";
     }
     renderExamHistory();
   }
@@ -950,7 +967,12 @@
       if (s) show("sim").then(() => openSim(s));
     },
     mapStore() { return store.map; },
-    mapToggle(id, on) { if (on) store.map[id] = 1; else delete store.map[id]; save(); }
+    mapToggle(id, on) { if (on) store.map[id] = 1; else delete store.map[id]; save(); },
+    // laboratorio (js/lab.js): progressi dei kata e dialoghi condivisi
+    labStore() { return store.lab; },
+    labSave() { save(); },
+    toast,
+    confirm: confirmDialog
   };
 
   // avvio

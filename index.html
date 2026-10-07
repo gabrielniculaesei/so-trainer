@@ -42,6 +42,7 @@
       <button data-view="esercizi">esercizi</button>
       <button data-view="mappa">mappa</button>
       <button data-view="sim">sim</button>
+      <button data-view="lab">lab</button>
       <button data-view="esame">esame</button>
       <button data-view="orale">orale</button>
       <button data-view="stats">stats</button>
@@ -95,6 +96,10 @@
       <button class="app" data-view="sim">
         <span class="app-cmd">sim</span>
         <span class="app-desc">simulazioni interattive: guarda gli algoritmi lavorare passo passo</span>
+      </button>
+      <button class="app" data-view="lab">
+        <span class="app-cmd">lab</span>
+        <span class="app-desc">laboratorio C + pthread: manuale delle funzioni e kata con output verificabile</span>
       </button>
       <button class="app" data-view="esame">
         <span class="app-cmd">esame</span>
@@ -214,6 +219,18 @@
     </div>
   </section>
 
+  <!-- ==================== LABORATORIO (C + pthread) ==================== -->
+  <section id="view-lab" class="view">
+    <h1>laboratorio</h1>
+    <div class="lab-tabs" role="tablist">
+      <button data-tab="kata" role="tab" class="on" aria-selected="true">kata</button>
+      <button data-tab="manuale" role="tab" aria-selected="false">manuale</button>
+    </div>
+    <div id="labKata"></div>
+    <div id="labManuale" class="hidden"></div>
+    <aside id="labDrawer" class="lab-drawer" aria-label="scheda del manuale"></aside>
+  </section>
+
   <!-- ==================== ESAME ==================== -->
   <section id="view-esame" class="view">
     <h1>simulazione esame</h1>
@@ -305,6 +322,7 @@
       <p id="statsOral"></p>
       <p id="statsOpen"></p>
       <p id="statsMap"></p>
+      <p id="statsLab"></p>
       <div id="statsBox" style="margin-top:1rem"></div>
       <div id="statsExams" style="margin-top:1rem"></div>
       <div class="quiz-controls">
@@ -349,6 +367,9 @@
 <script src="js/sims2.js"></script>
 <script src="js/sims3.js"></script>
 <script src="js/mappa.js"></script>
+<script src="data/lab_funzioni.js"></script>
+<script src="data/lab_kata.js"></script>
+<script src="js/lab.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
